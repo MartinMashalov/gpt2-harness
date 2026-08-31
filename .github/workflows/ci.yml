@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: ruff + pytest (CPU, offline)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install (CPU-only torch, no CUDA wheels)
+        # torch is pinned to the same range the package declares: torch.load
+        # changed its weights_only default in 2.6 and an unpinned install here
+        # would silently drift out of the supported range.
+        run: |
+          python -m pip install --upgrade pip
+          pip install --index-url https://download.pytorch.org/whl/cpu "torch>=2.2,<2.6"
+          pip install -e ".[dev]"
+
+      - name: Lint
+        run: ruff check .
+
+      - name: Test
+        # The runner has no GPU, no network and no GPT-2 checkpoint. Everything
+        # that needs the published weights is marked `weights` and deselected;
+        # what remains still covers the tokenizer algorithm, the causal mask, the
+        # naive-reference attention comparison, KV-cache equivalence, the
+        # quantization arithmetic, pruning accounting and training determinism.
+        env:
+          PYTHONHASHSEED: "0"
+        run: pytest -q -m "not weights" --durations=10
+
+      - name: Figures redraw from the committed results
+        run: python scripts/make_figures.py --assets /tmp/assets_ci
