@@ -410,10 +410,11 @@ appending the last entry.** Comparing our raw block-11 residual against
 completely correct. Verification harnesses have bugs too, and a harness bug looks
 exactly like a real one — the fix was to capture `ln_f`'s *input*.
 
-**The GELU you pick is not cosmetic.** GPT-2 shipped the tanh approximation.
-Using the exact erf form moves activations by ~1e-03 — an order of magnitude
-above the tolerance this repo verifies to, and enough to change greedy
-generations.
+**The GELU you pick is not cosmetic.** GPT-2 shipped the tanh approximation, not
+the exact erf form. The two differ by up to **4.74e-04** (at x = 2.70), which is
+almost an order of magnitude larger than the 6.1e-05 this implementation actually
+achieves on the final logits — so picking the wrong one turns a verified model
+into an unverified one.
 
 **Non-determinism will quietly destroy an ablation table.** The first version of
 the ablation grid ran on MPS at lr 6e-4 and produced **3.89 and 5.95 from two runs
@@ -426,7 +427,7 @@ and across processes agree to ~2e-04, two orders of magnitude below the 0.036
 seed-to-seed spread. **Every number in an ablation table is worthless without
 this check**, so it is now a test rather than an assumption.
 
-**"No measurable difference" is a result.** Four of the nine ablations landed
+**"No measurable difference" is a result.** Four of the eight ablations landed
 inside the seed spread. Reporting them as wins by picking a favourable seed would
 have been easy and is the default failure mode of this genre.
 

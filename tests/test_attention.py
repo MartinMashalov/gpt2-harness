@@ -138,10 +138,13 @@ def test_gelu_is_the_tanh_approximation() -> None:
     """GPT-2 shipped the tanh approximation; it is not the exact erf GELU."""
     from transformer_internals.model import gelu_tanh
 
-    x = torch.linspace(-4, 4, 400)
-    exact = F.gelu(x)
+    x = torch.linspace(-6, 6, 200_001)
     ours = gelu_tanh(x)
     assert torch.allclose(ours, F.gelu(x, approximate="tanh"), atol=1e-6)
-    # And it is measurably different from the exact form -- if this ever stops
-    # being true, the distinction the model docstring makes has evaporated.
-    assert (ours - exact).abs().max() > 1e-4
+
+    # The gap against the exact erf form is a number the README quotes, so it is
+    # pinned here: max |tanh-GELU - exact-GELU| = 4.74e-04, attained near
+    # x = +/- 2.70. If this drifts, the claim in the README is no longer true.
+    gap = (ours - F.gelu(x)).abs()
+    assert 4.7e-04 < gap.max().item() < 4.8e-04, gap.max().item()
+    assert abs(abs(x[gap.argmax()].item()) - 2.70) < 0.01

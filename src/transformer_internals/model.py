@@ -20,9 +20,10 @@ the point they happen:
   shape of the score matrix. With a KV cache the query block is short and the key
   block is long, and a mask built from ``(T, T)`` silently masks the wrong
   things. See :meth:`CausalSelfAttention.forward`.
-* **GPT-2 shipped the tanh approximation of GELU.** Using the exact erf form
-  moves the logits by ~1e-3, which is far above the 1e-4 tolerance this repo
-  verifies to, and is enough to change greedy generations.
+* **GPT-2 shipped the tanh approximation of GELU.** It differs from the exact erf
+  form by up to 4.74e-04 (at x = 2.70), which is larger than the 6.1e-05 this
+  implementation achieves on the final logits -- so using the exact form would
+  put the model outside its own verification tolerance.
 * **The residual-scaling init** (``0.02 / sqrt(2 * n_layer)``) applies to the two
   projections that *write into* the stream (attention output and MLP output),
   and to nothing else.
@@ -60,9 +61,10 @@ def gelu_tanh(x: torch.Tensor) -> torch.Tensor:
 
     Hendrycks & Gimpel give both this and the exact ``x * Phi(x)``; the OpenAI
     TensorFlow code used this one, so a faithful reimplementation must too. The
-    two differ by up to ~1e-3 in the activation, which propagates to roughly the
-    same order in the logits -- an order of magnitude above the tolerance the
-    verification suite asserts, so this is not a stylistic choice.
+    two differ by up to 4.74e-04 in the activation (maximum at x = 2.70), which is
+    larger than the 6.1e-05 this implementation achieves on the final logits -- so
+    this is not a stylistic choice, it is the difference between matching the
+    reference and not.
 
     Args:
         x: Any shape.
