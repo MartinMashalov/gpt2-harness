@@ -1,0 +1,196 @@
+{
+  "baseline": {
+    "loss_mean": 2.905370980501175,
+    "loss_std": 0.12529295220939846,
+    "ppl_mean": 18.399338944372452,
+    "ppl_std": 2.3470625226616106,
+    "ppl_of_mean_loss": 18.272020958499873,
+    "n_chunks": 8,
+    "chunk_losses": [
+      3.1177494525909424,
+      3.021502137184143,
+      2.8733716011047363,
+      2.882812976837158,
+      2.9598050117492676,
+      2.7278436422348022,
+      2.874135136604309,
+      2.7857478857040405
+    ],
+    "bytes": 497759232,
+    "speed": {}
+  },
+  "rows": [
+    {
+      "label": "int8 per-channel",
+      "bits": 8,
+      "granularity": "per_channel",
+      "include_embedding": false,
+      "n_quantized_tensors": 48,
+      "n_quantized_params": 84934656,
+      "n_total_params": 124439808,
+      "fraction_quantized": 0.6825360579148435,
+      "packed_bytes": 243359722,
+      "fp32_bytes": 497759232,
+      "compression_ratio": 2.045364072202548,
+      "quality": {
+        "loss_mean": 2.9072522670030594,
+        "loss_std": 0.12509554628793254,
+        "ppl_mean": 18.433469185365716,
+        "ppl_std": 2.3445493491384286,
+        "ppl_of_mean_loss": 18.306428219701324,
+        "n_chunks": 8,
+        "chunk_losses": [
+          3.117867588996887,
+          3.023363471031189,
+          2.8747225999832153,
+          2.885254383087158,
+          2.963117837905884,
+          2.728869676589966,
+          2.877221465110779,
+          2.787601113319397
+        ]
+      },
+      "speed": {},
+      "highlight": false
+    },
+    {
+      "label": "int8 per-tensor",
+      "bits": 8,
+      "granularity": "per_tensor",
+      "include_embedding": false,
+      "n_quantized_tensors": 48,
+      "n_quantized_params": 84934656,
+      "n_total_params": 124439808,
+      "fraction_quantized": 0.6825360579148435,
+      "packed_bytes": 243026986,
+      "fp32_bytes": 497759232,
+      "compression_ratio": 2.048164445408544,
+      "quality": {
+        "loss_mean": 3.017536610364914,
+        "loss_std": 0.1232620538140652,
+        "ppl_mean": 20.579220033076773,
+        "ppl_std": 2.597733957068764,
+        "ppl_of_mean_loss": 20.440875771162233,
+        "n_chunks": 8,
+        "chunk_losses": [
+          3.2372353076934814,
+          3.118212580680847,
+          2.970435380935669,
+          2.9905718564987183,
+          3.067721724510193,
+          2.8393585681915283,
+          3.001626133918762,
+          2.9151313304901123
+        ]
+      },
+      "speed": {},
+      "highlight": false
+    },
+    {
+      "label": "int4 per-channel",
+      "bits": 4,
+      "granularity": "per_channel",
+      "include_embedding": false,
+      "n_quantized_tensors": 48,
+      "n_quantized_params": 84934656,
+      "n_total_params": 124439808,
+      "fraction_quantized": 0.6825360579148435,
+      "packed_bytes": 200892202,
+      "fp32_bytes": 497759232,
+      "compression_ratio": 2.477742924038435,
+      "quality": {
+        "loss_mean": 3.17856402695179,
+        "loss_std": 0.12567527502334525,
+        "ppl_mean": 24.182078577037842,
+        "ppl_std": 3.1370266512309852,
+        "ppl_of_mean_loss": 24.012247842630444,
+        "n_chunks": 8,
+        "chunk_losses": [
+          3.4118340015411377,
+          3.2720338106155396,
+          3.1283352375030518,
+          3.1880946159362793,
+          3.2163751125335693,
+          2.9989253282546997,
+          3.1251132488250732,
+          3.0878008604049683
+        ]
+      },
+      "speed": {},
+      "highlight": false
+    },
+    {
+      "label": "int4 per-tensor",
+      "bits": 4,
+      "granularity": "per_tensor",
+      "include_embedding": false,
+      "n_quantized_tensors": 48,
+      "n_quantized_params": 84934656,
+      "n_total_params": 124439808,
+      "fraction_quantized": 0.6825360579148435,
+      "packed_bytes": 200559466,
+      "fp32_bytes": 497759232,
+      "compression_ratio": 2.4818535964789614,
+      "quality": {
+        "loss_mean": 7.737108588218689,
+        "loss_std": 0.0889256392918063,
+        "ppl_mean": 2299.971992694767,
+        "ppl_std": 212.24347761870132,
+        "ppl_of_mean_loss": 2291.83615165706,
+        "n_chunks": 8,
+        "chunk_losses": [
+          7.7734105587005615,
+          7.7712202072143555,
+          7.731956720352173,
+          7.7239089012146,
+          7.917009592056274,
+          7.699443817138672,
+          7.642534494400024,
+          7.637384414672852
+        ]
+      },
+      "speed": {},
+      "highlight": false
+    },
+    {
+      "label": "int8 per-channel + embedding",
+      "bits": 8,
+      "granularity": "per_channel",
+      "include_embedding": true,
+      "n_quantized_tensors": 49,
+      "n_quantized_params": 123532032,
+      "n_total_params": 124439808,
+      "fraction_quantized": 0.9927050996414266,
+      "packed_bytes": 127769198,
+      "fp32_bytes": 497759232,
+      "compression_ratio": 3.8957686186619096,
+      "quality": {
+        "loss_mean": 2.9795011579990387,
+        "loss_std": 0.12261147593158729,
+        "ppl_mean": 19.808916883706015,
+        "ppl_std": 2.462199302859153,
+        "ppl_of_mean_loss": 19.677997984096542,
+        "n_chunks": 8,
+        "chunk_losses": [
+          3.1813637018203735,
+          3.1000176668167114,
+          2.940516233444214,
+          2.958422303199768,
+          3.0334291458129883,
+          2.798194408416748,
+          2.951490879058838,
+          2.8725749254226685
+        ]
+      },
+      "speed": {},
+      "highlight": true
+    }
+  ],
+  "meta": {
+    "device": "cpu",
+    "n_chunks": 8,
+    "batch_size": 4,
+    "speed_measured": false,
+    "note": "Simulated quantization: weights are quantize-dequantized, so quality and size are real while speed is fp32. PyTorch 2.2 has no int4 kernel and no int8 MPS kernel, so a speedup cannot be measured here honestly."
+  }
+}
