@@ -66,11 +66,12 @@ __all__ = [
 
 Granularity = Literal["per_tensor", "per_channel"]
 
-#: Which weights get quantized. The block linears are ~85% of the parameters
-#: outside the embedding and are where every real quantization scheme starts.
-#: LayerNorm gains and all biases stay fp32: they are a rounding error in size
-#: (0.03% of the model) and quantizing them costs real accuracy, which is the
-#: worst trade available.
+#: Which weights get quantized. For GPT-2 124M these are 84,934,656 parameters:
+#: 99.9% of everything outside the embedding tables, and 68.3% of the whole
+#: model. That gap is why int8 here compresses by 2.05x rather than 4x -- the
+#: 38.6M-parameter token embedding is left in fp32 by default.
+#: LayerNorm gains and all biases stay fp32 too: together they are under 0.1% of
+#: the parameters, so quantizing them buys nothing and costs real accuracy.
 TARGET_SUFFIXES = ("attn.c_attn", "attn.c_proj", "mlp.c_fc", "mlp.c_proj")
 
 
