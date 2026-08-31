@@ -28,7 +28,13 @@ classifiers = [
 ]
 dependencies = [
     "torch>=2.2,<2.6",
-    "numpy>=1.24,<2.3",
+    # numpy is capped below 2.0 on purpose. torch 2.2 wheels are compiled against
+    # the NumPy 1.x C API; installed alongside NumPy 2.x they load, but the
+    # torch<->numpy bridge is dead ("Failed to initialize NumPy: _ARRAY_API not
+    # found"), so tensor.numpy() and torch.from_numpy() raise at runtime and the
+    # data pipeline fails. NumPy 2 support landed in torch 2.3, but this package
+    # supports torch from 2.2, so the cap has to hold for the whole range.
+    "numpy>=1.24,<2",
     "regex>=2023.0",
     "matplotlib>=3.7",
 ]
