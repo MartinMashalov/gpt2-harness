@@ -329,8 +329,8 @@ away.
 
 **MLP neurons prune far more gracefully than attention heads.** Removing 9.1% of
 parameters as neurons costs 0.31 nats; removing 4.6% as heads costs 1.22 nats —
-four times fewer parameters for four times the damage. GPT-2 small does not have
-redundant heads to spare.
+**half as many parameters removed, four times the damage**. GPT-2 small does not
+have redundant heads to spare.
 
 **Tying this back to the induction result.** Pruning heads destroys induction
 behaviour quickly: second-copy loss on the repeated-sequence probe rises from
