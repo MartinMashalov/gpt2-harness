@@ -1,0 +1,36 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+
+# ---- Environments ----
+.venv/
+venv/
+env/
+
+# ---- Caches and checkpoints that must NOT be committed ----
+# data/ holds the tokenized corpus cache, rebuilt in seconds by any script.
+data/
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+wandb/
+
+# NOTE: results/ and assets/ ARE committed on purpose. Every number in the
+# README has to be traceable to a file in this repository, and every figure has
+# to be redrawable from those files with `make figures`.
+
+# ---- macOS ----
+.DS_Store
+.AppleDouble
+._*
+.Spotlight-V100
+.Trashes

@@ -1,0 +1,81 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "transformer-internals"
+version = "0.1.0"
+description = "GPT-2 rebuilt from the paper, verified against the reference implementation, then taken apart to measure what every part of it is worth."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Martin Mashalov", email = "statsplay.us@gmail.com" }]
+keywords = [
+    "transformer",
+    "gpt-2",
+    "pytorch",
+    "from-scratch",
+    "interpretability",
+    "induction-heads",
+    "kv-cache",
+    "quantization",
+    "inference-efficiency",
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "torch>=2.2,<2.6",
+    "numpy>=1.24,<2.3",
+    "regex>=2023.0",
+    "matplotlib>=3.7",
+]
+
+[project.optional-dependencies]
+# The reference oracle and the checkpoint fetcher. Not needed to run the model,
+# only to verify it -- which is why they are optional rather than required.
+verify = ["transformers>=4.40,<5", "huggingface_hub>=0.20", "safetensors>=0.4"]
+dev = ["pytest>=7.4", "ruff>=0.4"]
+
+[project.urls]
+Homepage = "https://github.com/MartinMashalov/transformer-internals"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "weights: needs the published GPT-2 checkpoint (deselected in CI, which is offline)",
+    "slow: takes more than a few seconds",
+]
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+src = ["src", "tests", "scripts"]
+extend-exclude = [".venv", "data", "results", "assets"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "C4", "SIM", "RET", "ARG", "PTH", "NPY", "RUF"]
+ignore = [
+    "E501",    # long lines are the formatter's business, not the linter's
+    "RET504",  # a named return value often documents intent
+    "B008",    # dataclass-style defaults in signatures are deliberate here
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["ARG001", "SLF001"]
+# sys.path is set up before the local imports, deliberately.
+"scripts/*" = ["E402", "RUF001"]
+# RUF001 flags "ambiguous" Unicode. In these two files the characters in
+# question are the multiplication sign and a Greek alpha, appearing only inside
+# figure labels and console output where they are the typographically correct
+# glyph. They are never identifiers.
+"src/transformer_internals/viz.py" = ["RUF001"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["transformer_internals"]
