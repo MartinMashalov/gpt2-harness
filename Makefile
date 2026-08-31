@@ -24,25 +24,25 @@ fmt:  ## ruff autofix + format
 	$(PY) -m ruff check --fix .
 	$(PY) -m ruff format .
 
-verify:  ## PART 2 -- prove the implementation equals HuggingFace GPT-2 (~3 min, CPU)
+verify:  ## PART 2 -- prove the implementation equals HuggingFace GPT-2 (~2 min, CPU)
 	$(PY) scripts/run_verification.py
 
-ablate:  ## PART 3 -- 9 configurations x 3 seeds (~20 min)
+ablate:  ## PART 3 -- 9 configurations x 3 seeds (18 min measured)
 	$(PY) scripts/run_ablations.py
 
-induction:  ## PART 3 -- find induction heads in GPT-2 small (~4 min, CPU)
+induction:  ## PART 3 -- find induction heads in GPT-2 small (~5 min, CPU)
 	$(PY) scripts/run_induction.py
 
-kv:  ## PART 4 -- KV cache latency, throughput and memory (~4 min)
+kv:  ## PART 4 -- KV cache latency, throughput and memory (~2 min)
 	$(PY) scripts/run_kv_cache.py
 
-quantize:  ## PART 4 -- int8/int4, per-tensor vs per-channel (~6 min, CPU)
+quantize:  ## PART 4 -- int8/int4, per-tensor vs per-channel (~4 min, CPU)
 	$(PY) scripts/run_quantization.py
 
-prune:  ## PART 4 -- structured head and neuron pruning (~6 min, CPU)
+prune:  ## PART 4 -- structured head and neuron pruning (~5 min, CPU)
 	$(PY) scripts/run_pruning.py
 
-distill:  ## PART 4 -- distil GPT-2 into a 4-layer student (~5 min)
+distill:  ## PART 4 -- distil GPT-2 into a 4-layer student (20 min measured, CPU)
 	$(PY) scripts/run_distillation.py
 
 pareto:  ## PART 4 -- collect every configuration into one quality/size frontier

@@ -478,14 +478,15 @@ git clone https://github.com/MartinMashalov/transformer-internals
 cd transformer-internals
 make install          # creates .venv, installs with dev + verify extras
 
-make test-fast        # what CI runs: no weights, no network (~15 s)
-make verify           # Part 2: prove equivalence to GPT-2 (~3 min, downloads the checkpoint)
-make induction        # Part 3: find the induction heads (~4 min)
-make ablate           # Part 3: 9 configurations x 3 seeds (~18 min)
-make kv               # Part 4: KV cache latency and memory (~3 min)
-make quantize         # Part 4: int8/int4, per-tensor vs per-channel (~5 min)
-make prune            # Part 4: structured pruning (~6 min)
-make distill          # Part 4: distillation vs from-scratch (~10 min)
+make test-fast        # what CI runs: no weights, no network (~7 s)
+make verify           # Part 2: prove equivalence to GPT-2 (~2 min + checkpoint download)
+make induction        # Part 3: find the induction heads (~5 min)
+make ablate           # Part 3: 9 configurations x 3 seeds (18 min measured)
+make kv               # Part 4: KV cache latency and memory (~2 min)
+make quantize         # Part 4: int8/int4, per-tensor vs per-channel (~4 min)
+make prune            # Part 4: structured pruning (~5 min)
+make distill          # Part 4: distillation vs from-scratch (20 min measured, CPU)
+make pareto           # Part 4: one comparable size/quality frontier (~4 min)
 make figures          # redraw every figure from committed results
 ```
 
