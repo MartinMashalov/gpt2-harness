@@ -281,6 +281,12 @@ cost while throwing away the entire memory win.
 `pack_int4`). Sizes are real files on disk — int4 codes are genuinely packed two
 per byte. Source: [`results/quantization.json`](results/quantization.json).*
 
+> The fp32 perplexity differs between sections — 19.57 in the verification
+> table, 18.27 here, 18.74 on the frontier below — because each experiment scores
+> its own held-out slice (4,096 / 8,192 / 6,144 tokens). Comparisons are only ever
+> made *within* a section, and the frontier re-scores every configuration itself
+> for exactly this reason.
+
 | Scheme | Perplexity | Δ ppl | On disk | Compression |
 |---|---|---|---|---|
 | fp32 reference | 18.27 ± 2.35 | — | 497.8 MB | 1.00× |
