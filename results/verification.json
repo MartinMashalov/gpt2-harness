@@ -1,0 +1,971 @@
+{
+  "device": "cpu",
+  "dtype": "torch.float32",
+  "n_params": 124439808,
+  "logit_tolerance": 0.001,
+  "logits": {
+    "max_abs": 6.103515625e-05,
+    "max_rel": 7.243758822671878e-07,
+    "scale": 165.79750061035156,
+    "within_tolerance": true
+  },
+  "layers": [
+    {
+      "name": "embed",
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "mean_abs": 0.0,
+      "ref_scale": 4.562394142150879,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.0.ln_1",
+      "max_abs": 0.0,
+      "max_rel": 0.0,
+      "mean_abs": 0.0,
+      "ref_scale": 0.8089856505393982,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.0.attn",
+      "max_abs": 2.86102294921875e-06,
+      "max_rel": 2.9795361731209834e-05,
+      "mean_abs": 7.159461448383e-08,
+      "ref_scale": 16.236143112182617,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.0.resid_mid",
+      "max_abs": 2.86102294921875e-06,
+      "max_rel": 2.1064161435733244e-05,
+      "mean_abs": 7.172408610737571e-08,
+      "ref_scale": 16.01090431213379,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.0.ln_2",
+      "max_abs": 2.4586915969848633e-07,
+      "max_rel": 1.1097831546771621e-05,
+      "mean_abs": 2.358508734485238e-08,
+      "ref_scale": 2.80496883392334,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.0.mlp",
+      "max_abs": 6.67572021484375e-06,
+      "max_rel": 8.528448937552073e-05,
+      "mean_abs": 2.597803055929641e-07,
+      "ref_scale": 101.6441421508789,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.0.resid_out",
+      "max_abs": 5.9604644775390625e-06,
+      "max_rel": 0.00010646538590031168,
+      "mean_abs": 2.6658526621758936e-07,
+      "ref_scale": 101.77925109863281,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.1.ln_1",
+      "max_abs": 3.5762786865234375e-07,
+      "max_rel": 2.4764489702925182e-05,
+      "mean_abs": 2.765921180980513e-08,
+      "ref_scale": 1.6482906341552734,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.1.attn",
+      "max_abs": 8.106231689453125e-06,
+      "max_rel": 8.752297478087998e-05,
+      "mean_abs": 1.6953809891775666e-07,
+      "ref_scale": 32.03985595703125,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.1.resid_mid",
+      "max_abs": 5.7220458984375e-06,
+      "max_rel": 9.072541951782929e-05,
+      "mean_abs": 3.079636371694505e-07,
+      "ref_scale": 132.8540802001953,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.1.ln_2",
+      "max_abs": 3.5762786865234375e-07,
+      "max_rel": 1.3119306619824833e-05,
+      "mean_abs": 3.4417927155219434e-08,
+      "ref_scale": 6.529123306274414,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.1.mlp",
+      "max_abs": 9.298324584960938e-06,
+      "max_rel": 7.984031936127745e-05,
+      "mean_abs": 2.866325101220152e-07,
+      "ref_scale": 486.4778137207031,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.1.resid_out",
+      "max_abs": 9.5367431640625e-06,
+      "max_rel": 9.890983607596783e-05,
+      "mean_abs": 3.259164966746337e-07,
+      "ref_scale": 614.319091796875,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.2.ln_1",
+      "max_abs": 6.854534149169922e-07,
+      "max_rel": 1.4904332488986918e-05,
+      "mean_abs": 3.6271560727780324e-08,
+      "ref_scale": 4.219950199127197,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.2.attn",
+      "max_abs": 2.86102294921875e-06,
+      "max_rel": 6.947880370132535e-05,
+      "mean_abs": 1.8907606621117642e-07,
+      "ref_scale": 4.237236976623535,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.2.resid_mid",
+      "max_abs": 9.5367431640625e-06,
+      "max_rel": 8.300049657193639e-05,
+      "mean_abs": 3.8431543442938064e-07,
+      "ref_scale": 614.27978515625,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.2.ln_2",
+      "max_abs": 7.152557373046875e-07,
+      "max_rel": 1.578104647760973e-05,
+      "mean_abs": 5.048222343854528e-08,
+      "ref_scale": 19.845230102539062,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.2.mlp",
+      "max_abs": 1.239776611328125e-05,
+      "max_rel": 0.00025602836947186504,
+      "mean_abs": 3.697384575692316e-07,
+      "ref_scale": 2321.28125,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.2.resid_out",
+      "max_abs": 1.1444091796875e-05,
+      "max_rel": 0.00012493152791258637,
+      "mean_abs": 4.5285188308399585e-07,
+      "ref_scale": 2465.7578125,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.3.ln_1",
+      "max_abs": 1.430511474609375e-06,
+      "max_rel": 2.2435715879656676e-05,
+      "mean_abs": 5.756560312875081e-08,
+      "ref_scale": 6.253533363342285,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.3.attn",
+      "max_abs": 1.4543533325195312e-05,
+      "max_rel": 9.97544931086271e-05,
+      "mean_abs": 3.2120195909455006e-07,
+      "ref_scale": 3.0639686584472656,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.3.resid_mid",
+      "max_abs": 1.52587890625e-05,
+      "max_rel": 0.00019462852126618605,
+      "mean_abs": 5.679869597467284e-07,
+      "ref_scale": 2462.89453125,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.3.ln_2",
+      "max_abs": 7.152557373046875e-07,
+      "max_rel": 4.148319339120314e-05,
+      "mean_abs": 7.213160289312428e-08,
+      "ref_scale": 9.154863357543945,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.3.mlp",
+      "max_abs": 2.288818359375e-05,
+      "max_rel": 0.0001619910168617922,
+      "mean_abs": 4.629907279094267e-07,
+      "ref_scale": 175.44894409179688,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.3.resid_out",
+      "max_abs": 2.86102294921875e-05,
+      "max_rel": 0.00021634593938745105,
+      "mean_abs": 6.452645821910765e-07,
+      "ref_scale": 2638.343505859375,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.4.ln_1",
+      "max_abs": 2.86102294921875e-06,
+      "max_rel": 2.536104866765731e-05,
+      "mean_abs": 8.207763231540512e-08,
+      "ref_scale": 5.2205963134765625,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.4.attn",
+      "max_abs": 5.7220458984375e-06,
+      "max_rel": 0.00013660894351994772,
+      "mean_abs": 3.119328741579213e-07,
+      "ref_scale": 3.118905544281006,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.4.resid_mid",
+      "max_abs": 2.47955322265625e-05,
+      "max_rel": 0.00016408401101363897,
+      "mean_abs": 7.070793395137621e-07,
+      "ref_scale": 2637.171142578125,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.4.ln_2",
+      "max_abs": 8.344650268554688e-07,
+      "max_rel": 2.427105026350638e-05,
+      "mean_abs": 7.503264593348528e-08,
+      "ref_scale": 8.84114933013916,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.4.mlp",
+      "max_abs": 1.239776611328125e-05,
+      "max_rel": 0.00017504583436978892,
+      "mean_abs": 5.145875750006073e-07,
+      "ref_scale": 147.84164428710938,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.4.resid_out",
+      "max_abs": 1.9073486328125e-05,
+      "max_rel": 0.00031541457302942553,
+      "mean_abs": 7.761807258551319e-07,
+      "ref_scale": 2785.0126953125,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.5.ln_1",
+      "max_abs": 1.9073486328125e-06,
+      "max_rel": 4.238851428257439e-05,
+      "mean_abs": 1.0457180097647425e-07,
+      "ref_scale": 5.605217933654785,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.5.attn",
+      "max_abs": 4.76837158203125e-06,
+      "max_rel": 0.00013279771587928688,
+      "mean_abs": 3.0399965503925663e-07,
+      "ref_scale": 3.352053642272949,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.5.resid_mid",
+      "max_abs": 1.52587890625e-05,
+      "max_rel": 0.00024677777243324974,
+      "mean_abs": 8.351560811408692e-07,
+      "ref_scale": 2783.672119140625,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.5.ln_2",
+      "max_abs": 8.046627044677734e-07,
+      "max_rel": 3.754500950762633e-05,
+      "mean_abs": 8.317763584070943e-08,
+      "ref_scale": 11.044017791748047,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.5.mlp",
+      "max_abs": 1.71661376953125e-05,
+      "max_rel": 0.00022116707972251747,
+      "mean_abs": 5.593047414246636e-07,
+      "ref_scale": 98.95439910888672,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.5.resid_out",
+      "max_abs": 1.52587890625e-05,
+      "max_rel": 0.0001721058311316191,
+      "mean_abs": 8.929731039744284e-07,
+      "ref_scale": 2882.62646484375,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.6.ln_1",
+      "max_abs": 2.384185791015625e-06,
+      "max_rel": 3.7537254842894234e-05,
+      "mean_abs": 1.0205309687686774e-07,
+      "ref_scale": 5.577019691467285,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.6.attn",
+      "max_abs": 6.020069122314453e-06,
+      "max_rel": 0.0001226153493380424,
+      "mean_abs": 2.7423565269499604e-07,
+      "ref_scale": 3.3707313537597656,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.6.resid_mid",
+      "max_abs": 1.9073486328125e-05,
+      "max_rel": 0.00023607176581680832,
+      "mean_abs": 9.416747262649652e-07,
+      "ref_scale": 2883.373779296875,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.6.ln_2",
+      "max_abs": 7.152557373046875e-07,
+      "max_rel": 3.8207564448603175e-05,
+      "mean_abs": 7.809610799035404e-08,
+      "ref_scale": 10.242844581604004,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.6.mlp",
+      "max_abs": 2.09808349609375e-05,
+      "max_rel": 0.00024254247788777137,
+      "mean_abs": 5.721778709105113e-07,
+      "ref_scale": 57.898277282714844,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.6.resid_out",
+      "max_abs": 1.9073486328125e-05,
+      "max_rel": 0.0003302191130822652,
+      "mean_abs": 9.954771182189386e-07,
+      "ref_scale": 2941.27197265625,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.7.ln_1",
+      "max_abs": 2.384185791015625e-06,
+      "max_rel": 3.20880523368606e-05,
+      "mean_abs": 1.0521513710652167e-07,
+      "ref_scale": 5.236897945404053,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.7.attn",
+      "max_abs": 5.7220458984375e-06,
+      "max_rel": 9.492919863934815e-05,
+      "mean_abs": 2.2424819184784106e-07,
+      "ref_scale": 5.557944297790527,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.7.resid_mid",
+      "max_abs": 1.9073486328125e-05,
+      "max_rel": 0.0003398324527301519,
+      "mean_abs": 1.030258297558046e-06,
+      "ref_scale": 2941.927490234375,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.7.ln_2",
+      "max_abs": 6.556510925292969e-07,
+      "max_rel": 2.7938175592728748e-05,
+      "mean_abs": 7.603496467507083e-08,
+      "ref_scale": 9.877541542053223,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.7.mlp",
+      "max_abs": 1.1444091796875e-05,
+      "max_rel": 0.00023406494162876056,
+      "mean_abs": 6.249786868769055e-07,
+      "ref_scale": 34.90763473510742,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.7.resid_out",
+      "max_abs": 2.47955322265625e-05,
+      "max_rel": 0.0003340327634389379,
+      "mean_abs": 1.110845025525325e-06,
+      "ref_scale": 2976.835205078125,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.8.ln_1",
+      "max_abs": 9.5367431640625e-07,
+      "max_rel": 5.3860427778635115e-05,
+      "mean_abs": 9.724723087048107e-08,
+      "ref_scale": 5.222665309906006,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.8.attn",
+      "max_abs": 5.7220458984375e-06,
+      "max_rel": 9.62369900516807e-05,
+      "mean_abs": 2.788231035487519e-07,
+      "ref_scale": 6.974180221557617,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.8.resid_mid",
+      "max_abs": 2.6702880859375e-05,
+      "max_rel": 0.0002853121057520814,
+      "mean_abs": 1.1682615473142101e-06,
+      "ref_scale": 2978.658935546875,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.8.ln_2",
+      "max_abs": 5.960464477539062e-07,
+      "max_rel": 3.2239810147434185e-05,
+      "mean_abs": 7.538005775131751e-08,
+      "ref_scale": 8.013222694396973,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.8.mlp",
+      "max_abs": 1.430511474609375e-05,
+      "max_rel": 0.00020518870949126023,
+      "mean_abs": 6.762074109347951e-07,
+      "ref_scale": 22.90099334716797,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.8.resid_out",
+      "max_abs": 2.288818359375e-05,
+      "max_rel": 0.00026742363630385464,
+      "mean_abs": 1.2775643780413602e-06,
+      "ref_scale": 2998.923828125,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.9.ln_1",
+      "max_abs": 9.5367431640625e-07,
+      "max_rel": 4.237114936470506e-05,
+      "mean_abs": 9.969517375591547e-08,
+      "ref_scale": 4.305441856384277,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.9.attn",
+      "max_abs": 8.58306884765625e-06,
+      "max_rel": 0.00012496150739281202,
+      "mean_abs": 3.3279079111202415e-07,
+      "ref_scale": 5.887365341186523,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.9.resid_mid",
+      "max_abs": 1.9073486328125e-05,
+      "max_rel": 0.00046174937047213156,
+      "mean_abs": 1.3445516944759422e-06,
+      "ref_scale": 3000.3779296875,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.9.ln_2",
+      "max_abs": 7.152557373046875e-07,
+      "max_rel": 3.0758089027890595e-05,
+      "mean_abs": 7.516288557477916e-08,
+      "ref_scale": 6.811785697937012,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.9.mlp",
+      "max_abs": 1.71661376953125e-05,
+      "max_rel": 0.000335303693207937,
+      "mean_abs": 7.70448120116877e-07,
+      "ref_scale": 28.30158805847168,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.9.resid_out",
+      "max_abs": 2.288818359375e-05,
+      "max_rel": 0.0003431759319279741,
+      "mean_abs": 1.516070268634293e-06,
+      "ref_scale": 3010.6376953125,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.10.ln_1",
+      "max_abs": 1.430511474609375e-06,
+      "max_rel": 4.7170657459308665e-05,
+      "mean_abs": 1.0359734814200136e-07,
+      "ref_scale": 3.858865737915039,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.10.attn",
+      "max_abs": 1.52587890625e-05,
+      "max_rel": 0.00023306197931678363,
+      "mean_abs": 3.943681400010569e-07,
+      "ref_scale": 14.368878364562988,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.10.resid_mid",
+      "max_abs": 3.0517578125e-05,
+      "max_rel": 0.00034276694536083664,
+      "mean_abs": 1.613912495991422e-06,
+      "ref_scale": 3011.41357421875,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.10.ln_2",
+      "max_abs": 9.5367431640625e-07,
+      "max_rel": 3.0836466358624475e-05,
+      "mean_abs": 7.857733079516847e-08,
+      "ref_scale": 7.932251453399658,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.10.mlp",
+      "max_abs": 4.57763671875e-05,
+      "max_rel": 0.0003264104451342443,
+      "mean_abs": 1.0451408646379909e-06,
+      "ref_scale": 89.70860290527344,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.10.resid_out",
+      "max_abs": 4.57763671875e-05,
+      "max_rel": 0.00029197668213807476,
+      "mean_abs": 1.8967680969379015e-06,
+      "ref_scale": 3012.92724609375,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.11.ln_1",
+      "max_abs": 1.1920928955078125e-06,
+      "max_rel": 4.524693957992689e-05,
+      "mean_abs": 9.715312343258927e-08,
+      "ref_scale": 5.235358715057373,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.11.attn",
+      "max_abs": 7.62939453125e-05,
+      "max_rel": 0.00015018589046064562,
+      "mean_abs": 5.883971526701418e-07,
+      "ref_scale": 2570.288818359375,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.11.resid_mid",
+      "max_abs": 7.62939453125e-05,
+      "max_rel": 0.0005294245048677642,
+      "mean_abs": 2.1421237357167733e-06,
+      "ref_scale": 442.638427734375,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.11.ln_2",
+      "max_abs": 8.344650268554688e-07,
+      "max_rel": 4.473790078841158e-05,
+      "mean_abs": 8.147876037077771e-08,
+      "ref_scale": 2.046961784362793,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.11.mlp",
+      "max_abs": 5.340576171875e-05,
+      "max_rel": 0.000362322437189172,
+      "mean_abs": 1.321877546918889e-06,
+      "ref_scale": 116.94939422607422,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "h.11.resid_out",
+      "max_abs": 7.62939453125e-05,
+      "max_rel": 0.0004057043563462113,
+      "mean_abs": 2.4983817840822868e-06,
+      "ref_scale": 371.91607666015625,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "ln_f",
+      "max_abs": 6.103515625e-05,
+      "max_rel": 8.537803142488435e-05,
+      "mean_abs": 3.0662918612102253e-07,
+      "ref_scale": 244.42042541503906,
+      "shape": [
+        3,
+        5,
+        768
+      ]
+    },
+    {
+      "name": "logits",
+      "max_abs": 6.103515625e-05,
+      "max_rel": 7.243758822671878e-07,
+      "mean_abs": 1.0472513039163596e-05,
+      "ref_scale": 165.79750061035156,
+      "shape": [
+        3,
+        5,
+        50257
+      ]
+    }
+  ],
+  "generation": [
+    {
+      "prompt": "The capital of France is",
+      "n_prompt_tokens": 5,
+      "n_new_tokens": 300,
+      "match": true,
+      "first_divergence": null,
+      "text": "The capital of France is the capital of the French Republic, and the capital of the French Republic is the capital of the French Republic.\n\nThe French Republic is the capital of the French Republic.\n\nThe French Republic is the capital of the French Republic.\n\nThe French Republic is the capital of the French Republic.\n\nThe French Republic is the capital of the French Republic.\n\nThe French Republic is the capital of the French Republic.\n\nThe French Republic is the capital of the French Republic.\n\nThe French Republic is the capital of the French Republic.\n\nThe French Republic is the capital of the French Republic.\n\nThe French Republic is the capital of the French Republic.\n\nThe French Republic is the capital of the French Republic.\n\nThe French Republic is the capital of the French Republic.\n\nThe French Republic is the capital of the French Republic.\n\nThe French Republic is the capital of the French Republic.\n\nThe French Republic is the capital of the French Republic.\n\nThe French Republic is the capital of the French Republic.\n\nThe French Republic is the capital of the French Republic.\n\nThe French Republic is the capital of the French Republic.\n\nThe French Republic is the capital of the French Republic.\n\nThe French Republic is the capital of the French Republic.\n\nThe French Republic is the capital of the French Republic.\n\nThe French Republic is the capital of the French Republic.\n\nThe French Republic"
+    },
+    {
+      "prompt": "In 1969, humans first walked on the",
+      "n_prompt_tokens": 8,
+      "n_new_tokens": 300,
+      "match": true,
+      "first_divergence": null,
+      "text": "In 1969, humans first walked on the moon.\n\nIn the 1970s, humans first walked on the moon.\n\nIn the 1980s, humans first walked on the moon.\n\nIn the 1990s, humans first walked on the moon.\n\nIn the 2000s, humans first walked on the moon.\n\nIn the 2010s, humans first walked on the moon.\n\nIn the 2020s, humans first walked on the moon.\n\nIn the 2030s, humans first walked on the moon.\n\nIn the 2040s, humans first walked on the moon.\n\nIn the 2060s, humans first walked on the moon.\n\nIn the 2070s, humans first walked on the moon.\n\nIn the 2080s, humans first walked on the moon.\n\nIn the 2090s, humans first walked on the moon.\n\nIn the 2030s, humans first walked on the moon.\n\nIn the 2040s, humans first walked on the moon.\n\nIn the 2050s, humans first walked on the moon.\n\nIn the 2030s, humans first walked on the moon.\n\nIn the 2060s, humans first walked on the moon.\n\nIn the 2070s, humans first walked on the moon.\n\nIn the 2080s, humans first walked on the moon.\n\nIn the 2090s, humans first walked on the moon.\n\nIn the 2090s"
+    },
+    {
+      "prompt": "def fibonacci(n):\n    if n < 2:\n        return n\n    return",
+      "n_prompt_tokens": 31,
+      "n_new_tokens": 300,
+      "match": true,
+      "first_divergence": null,
+      "text": "def fibonacci(n):\n    if n < 2:\n        return n\n    return n\n\nelse :\n\nreturn fibonacci(n)\n\ndef fibonacci(n):\n\nreturn fibonacci(n)\n\ndef fibonacci(n):\n\nreturn fibonacci(n)\n\ndef fibonacci(n):\n\nreturn fibonacci(n)\n\ndef fibonacci(n):\n\nreturn fibonacci(n)\n\ndef fibonacci(n):\n\nreturn fibonacci(n)\n\ndef fibonacci(n):\n\nreturn fibonacci(n)\n\ndef fibonacci(n):\n\nreturn fibonacci(n)\n\ndef fibonacci(n):\n\nreturn fibonacci(n)\n\ndef fibonacci(n):\n\nreturn fibonacci(n)\n\ndef fibonacci(n):\n\nreturn fibonacci(n)\n\ndef fibonacci(n):\n\nreturn fibonacci(n)\n\ndef fibonacci(n):\n\nreturn fibonacci(n)\n\ndef fibonacci(n):\n\nreturn fibonacci(n)\n\ndef fibonacci(n):\n\nreturn fibonacci(n)\n\ndef fibonacci(n):\n\nreturn fibonacci(n)\n\ndef fibonacci(n):\n\nreturn fibonacci("
+    },
+    {
+      "prompt": "Alice went to the store. Bob went to the store. Alice went to the",
+      "n_prompt_tokens": 16,
+      "n_new_tokens": 300,
+      "match": true,
+      "first_divergence": null,
+      "text": "Alice went to the store. Bob went to the store. Alice went to the store.\n\n\"I'm sorry, but I'm not going to be able to go to the store. I'm not going to be able to go to the store. I'm not going to be able to go to the store. I'm not going to be able to go to the store. I'm not going to be able to go to the store. I'm not going to be able to go to the store. I'm not going to be able to go to the store. I'm not going to be able to go to the store. I'm not going to be able to go to the store. I'm not going to be able to go to the store. I'm not going to be able to go to the store. I'm not going to be able to go to the store. I'm not going to be able to go to the store. I'm not going to be able to go to the store. I'm not going to be able to go to the store. I'm not going to be able to go to the store. I'm not going to be able to go to the store. I'm not going to be able to go to the store. I'm not going to be able to go to the store. I'm not going to be able to go to the store. I'm not going to be able to go to the store. I'm not going to be able to go to the store. I'm not going"
+    },
+    {
+      "prompt": "The meaning of the word 'serendipity' is",
+      "n_prompt_tokens": 12,
+      "n_new_tokens": 300,
+      "match": true,
+      "first_divergence": null,
+      "text": "The meaning of the word 'serendipity' is that it is a way of expressing the fact that the person who is not a member of the family is not a member of the family.\n\nThe word 'serendipity' is used in the context of the word 'family' to mean the family of a person.\n\nThe word 'serendipity' is used in the context of the word 'family' to mean the family of a person.\n\nThe word 'serendipity' is used in the context of the word 'family' to mean the family of a person.\n\nThe word 'serendipity' is used in the context of the word 'family' to mean the family of a person.\n\nThe word 'serendipity' is used in the context of the word 'family' to mean the family of a person.\n\nThe word 'serendipity' is used in the context of the word 'family' to mean the family of a person.\n\nThe word 'serendipity' is used in the context of the word 'family' to mean the family of a person.\n\nThe word 'serendipity' is used in the context of the word 'family' to mean the family of a person.\n\nThe word 'serendipity' is used in the context of the word 'family' to mean the family of a person.\n\nThe word 'serendipity' is"
+    }
+  ],
+  "all_generations_match": true,
+  "perplexity": {
+    "n_tokens": 4096,
+    "n_batches": 8,
+    "ours_loss": 2.973859041929245,
+    "reference_loss": 2.9738591015338898,
+    "ours_ppl": 19.56728505674032,
+    "reference_ppl": 19.56728622304143,
+    "abs_ppl_diff": 1.16630111079985e-06
+  },
+  "timing": {
+    "activations_s": 0.8805722919641994,
+    "generation_s": 89.28125116694719,
+    "perplexity_s": 15.186602125002537
+  }
+}
