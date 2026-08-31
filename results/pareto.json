@@ -1,0 +1,144 @@
+{
+  "points": [
+    {
+      "label": "GPT-2 124M fp32",
+      "family": "baseline",
+      "size_mb": 497.759232,
+      "loss": 2.930514136950175,
+      "ppl": 18.73726153912572,
+      "detail": "the verified reference point",
+      "pareto_optimal": true
+    },
+    {
+      "label": "int8/chan",
+      "family": "quantization",
+      "size_mb": 243.359722,
+      "loss": 2.93219925959905,
+      "ppl": 18.76886274139604,
+      "detail": "8-bit, per_channel scales",
+      "pareto_optimal": true
+    },
+    {
+      "label": "int8/tensor",
+      "family": "quantization",
+      "size_mb": 243.026986,
+      "loss": 3.037255903085073,
+      "ppl": 20.847955858630193,
+      "detail": "8-bit, per_tensor scales",
+      "pareto_optimal": true
+    },
+    {
+      "label": "int4/chan",
+      "family": "quantization",
+      "size_mb": 200.892202,
+      "loss": 3.2025996843973794,
+      "ppl": 24.596390004798227,
+      "detail": "4-bit, per_channel scales",
+      "pareto_optimal": true
+    },
+    {
+      "label": "int4/tensor",
+      "family": "quantization",
+      "size_mb": 200.559466,
+      "loss": 7.769491632779439,
+      "ppl": 2367.267541188237,
+      "detail": "4-bit, per_tensor scales",
+      "pareto_optimal": true
+    },
+    {
+      "label": "head -10%",
+      "family": "pruning",
+      "size_mb": 486.738432,
+      "loss": 3.776682178179423,
+      "ppl": 43.670908811937366,
+      "detail": "heads pruned at 10% (2,755,200 params removed)",
+      "label_it": false,
+      "pareto_optimal": false
+    },
+    {
+      "label": "head -20%",
+      "family": "pruning",
+      "size_mb": 474.930432,
+      "loss": 4.214001218477885,
+      "ppl": 67.626587942316,
+      "detail": "heads pruned at 20% (5,707,200 params removed)",
+      "label_it": true,
+      "pareto_optimal": false
+    },
+    {
+      "label": "head -30%",
+      "family": "pruning",
+      "size_mb": 463.909632,
+      "loss": 5.278002937634786,
+      "ppl": 195.97810379039913,
+      "detail": "heads pruned at 30% (8,462,400 params removed)",
+      "label_it": false,
+      "pareto_optimal": false
+    },
+    {
+      "label": "head -50%",
+      "family": "pruning",
+      "size_mb": 441.080832,
+      "loss": 5.825545310974121,
+      "ppl": 338.84585907228126,
+      "detail": "heads pruned at 50% (14,169,600 params removed)",
+      "label_it": true,
+      "pareto_optimal": false
+    },
+    {
+      "label": "neur -10%",
+      "family": "pruning",
+      "size_mb": 475.097704,
+      "loss": 3.0452020168304443,
+      "ppl": 21.014276011537614,
+      "detail": "neurons pruned at 10% (5,665,382 params removed)",
+      "label_it": false,
+      "pareto_optimal": false
+    },
+    {
+      "label": "neur -20%",
+      "family": "pruning",
+      "size_mb": 452.430028,
+      "loss": 3.261243681112925,
+      "ppl": 26.081954614183093,
+      "detail": "neurons pruned at 20% (11,332,301 params removed)",
+      "label_it": true,
+      "pareto_optimal": false
+    },
+    {
+      "label": "neur -30%",
+      "family": "pruning",
+      "size_mb": 429.7685,
+      "loss": 3.79280678431193,
+      "ppl": 44.380792935999665,
+      "detail": "neurons pruned at 30% (16,997,683 params removed)",
+      "label_it": false,
+      "pareto_optimal": false
+    },
+    {
+      "label": "neur -50%",
+      "family": "pruning",
+      "size_mb": 384.439296,
+      "loss": 6.22812553246816,
+      "ppl": 506.80460380284234,
+      "detail": "neurons pruned at 50% (28,329,984 params removed)",
+      "label_it": true,
+      "pareto_optimal": false
+    }
+  ],
+  "pareto_front": [
+    "GPT-2 124M fp32",
+    "int8/chan",
+    "int8/tensor",
+    "int4/chan",
+    "int4/tensor"
+  ],
+  "meta": {
+    "device": "cpu",
+    "eval_tokens": 6144,
+    "eval_batches": 12,
+    "fp32_bytes": 497759232,
+    "n_params": 124439808,
+    "caption": "every point scored by one function on the same 6,144 held-out tokens \u00b7 sizes are packed bytes on disk"
+  }
+}

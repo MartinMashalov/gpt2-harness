@@ -525,9 +525,13 @@ def fig_distillation(dist: dict[str, Any], path: str | Path, web: bool = False) 
         ax.plot([h["step"] for h in hist], [h["val_loss"] for h in hist],
                 marker="o", markersize=3.0, linewidth=width, color=color, label=arm["label"])
         if arm["alpha"] == 0 or arm["label"] == best:
+            # The control and the best distilled arm finish within 0.02 nats of
+            # each other, so their end labels are pushed apart vertically --
+            # that near-tie is the result, and it must stay readable.
             ax.annotate(f"{hist[-1]['val_loss']:.3f}",
                         xy=(hist[-1]["step"], hist[-1]["val_loss"]),
-                        xytext=(6, 0), textcoords="offset points", fontsize=8,
+                        xytext=(7, 7 if arm["alpha"] == 0 else -9),
+                        textcoords="offset points", fontsize=8,
                         color=color, va="center", fontweight="bold")
     ax.set_xlabel("optimiser step")
     ax.set_ylabel("held-out loss (nats)")
@@ -541,31 +545,76 @@ def fig_distillation(dist: dict[str, Any], path: str | Path, web: bool = False) 
 
 
 def fig_pareto(pareto: dict[str, Any], path: str | Path, web: bool = False) -> Path:
-    """The summary chart: quality against size, every configuration as a point."""
+    """The summary chart: quality against size, every configuration on one axis.
+
+    Log y again, for the same reason as the quantization figure -- one
+    configuration is three orders of magnitude worse than the rest and a linear
+    axis would erase every distinction that matters.
+
+    The Pareto front is drawn as a step line. Note that the front necessarily
+    includes the smallest point however bad it is, since nothing can be both
+    smaller and better than the smallest thing; that is a property of dominance,
+    not an endorsement, and the caption says so.
+    """
     use_style(1.2 if web else 1.0)
-    fig, ax = plt.subplots(figsize=(7.0, 4.4) if not web else (6.6, 4.3))
+    points = pareto["points"]
+    fig, ax = plt.subplots(figsize=(7.4, 4.5) if not web else (6.8, 4.4))
 
-    families = {
-        "baseline": (ACCENT, "o", 9),
-        "quantization": (INK, "o", 6),
-        "pruning": ("#8C93A0", "s", 6),
-        "attention": ("#4A4F58", "^", 6),
+    styles = {
+        "baseline": (ACCENT, "o", 11),
+        "quantization": (INK, "o", 7),
+        "pruning": ("#A2A8B2", "s", 6),
     }
-    for p in pareto["points"]:
-        color, marker, size = families.get(p["family"], (MUTED, "o", 5))
-        ax.scatter(p["size_mb"], p["ppl"], s=size**2, marker=marker, color=color,
-                   zorder=4 if p["family"] == "baseline" else 3,
-                   edgecolor=SURFACE, linewidth=0.6)
-        if p.get("label_it", True):
-            ax.annotate(p["label"], xy=(p["size_mb"], p["ppl"]), xytext=(6, 3),
-                        textcoords="offset points", fontsize=7,
-                        color=color, fontweight="bold" if p["family"] == "baseline" else "normal")
 
+    front = sorted(
+        [p for p in points if p.get("pareto_optimal")], key=lambda p: p["size_mb"]
+    )
+    if front:
+        ax.step(
+            [p["size_mb"] for p in front], [p["ppl"] for p in front],
+            where="post", color=MUTED, linewidth=1.1, linestyle=(0, (4, 3)), zorder=2,
+        )
+
+    for p in points:
+        color, marker, size = styles.get(p["family"], (MUTED, "^", 6))
+        ax.scatter(p["size_mb"], p["ppl"], s=size**2, marker=marker, color=color,
+                   zorder=5 if p["family"] == "baseline" else 4,
+                   edgecolor=SURFACE, linewidth=0.7)
+
+    # Explicit per-point label offsets: several configurations land within a few
+    # MB of each other and a uniform offset guarantees overlapping text.
+    offsets = {
+        "GPT-2 124M fp32": (0, 14, "center"),
+        "int8/chan": (0, -18, "center"),
+        "int8/tensor": (0, 12, "center"),
+        "int4/chan": (0, -18, "center"),
+        "int4/tensor": (10, 0, "left"),
+        "neur -50%": (0, 11, "center"),
+        "head -50%": (0, 11, "center"),
+        "neur -20%": (0, -18, "center"),
+        "head -20%": (6, 8, "left"),
+    }
+    for p in points:
+        if p["label"] not in offsets:
+            continue
+        dx, dy, ha = offsets[p["label"]]
+        color = ACCENT if p["family"] == "baseline" else (
+            INK if p["family"] == "quantization" else "#8A9099"
+        )
+        ax.annotate(f"{p['label']}\n{p['ppl']:,.1f}", xy=(p["size_mb"], p["ppl"]),
+                    xytext=(dx, dy), textcoords="offset points", ha=ha,
+                    fontsize=7.2, color=color, linespacing=1.35,
+                    fontweight="bold" if p["family"] == "baseline" else "normal")
+
+    ax.set_yscale("log")
     ax.set_xlabel("model size on disk (MB)")
-    ax.set_ylabel("held-out perplexity")
+    ax.set_ylabel("held-out perplexity, log scale")
     _hgrid(ax)
-    ax.margins(x=0.20, y=0.16)
-    ax.set_title("Quality against size, every configuration measured", loc="left", pad=12)
+    ax.margins(x=0.16, y=0.30)
+    ax.set_title(
+        "Quantization dominates structured pruning on the size/quality frontier",
+        loc="left", pad=14,
+    )
     ax.annotate(pareto["meta"]["caption"], xy=(0, 1.02), xycoords="axes fraction",
                 fontsize=7.5, color=MUTED)
     return save(fig, path)
