@@ -260,31 +260,54 @@ def test_index_is_self_describing(tmp_path: Path) -> None:
 
 
 def test_async_save_matches_sync_save_and_blocks_for_less_time(tmp_path: Path) -> None:
-    """Overlapped save: the step pays for the copy, not for the write."""
+    """Overlapped save: the step pays for the copy, not for the write.
+
+    Best of three, on both arms, which is the statistic
+    ``scripts/run_cluster.py`` uses for the same measurement and says why: the
+    synchronous arm is at the mercy of the page cache, and a single sample of it
+    is a sample of whatever else the machine was doing. The assertion itself is
+    unchanged and is not a tolerance -- an async saver that actually blocked for
+    its write would lose on every repeat, not on the median one.
+    """
     torch.manual_seed(0)
     state = {f"w{i}": torch.randn(512, 512) for i in range(24)}  # ~25 MB
     plan = dict.fromkeys(state, REPLICATE)
     shapes = {k: list(v.shape) for k, v in state.items()}
 
-    t0 = time.perf_counter()
-    save_sharded(tmp_path / "sync", state, plan, rank=0, world_size=1, step=1, global_shapes=shapes)
-    sync_s = time.perf_counter() - t0
+    sync_samples: list[float] = []
+    async_samples: list[float] = []
+    write_s = 0.0
+    for i in range(3):
+        t0 = time.perf_counter()
+        save_sharded(
+            tmp_path / f"sync{i}", state, plan, rank=0, world_size=1, step=1,
+            global_shapes=shapes,
+        )
+        sync_samples.append(time.perf_counter() - t0)
 
-    saver = AsyncCheckpointer()
-    saver.save(tmp_path / "async", state, plan=plan, rank=0, world_size=1, step=1, global_shapes=shapes)
-    blocking_s = saver.last_blocking_seconds
-    saver.wait()
+        saver = AsyncCheckpointer()
+        saver.save(
+            tmp_path / f"async{i}", state, plan=plan, rank=0, world_size=1, step=1,
+            global_shapes=shapes,
+        )
+        async_samples.append(saver.last_blocking_seconds)
+        saver.wait()
+        write_s = saver.last_write_seconds
 
-    a, _ = load_full(tmp_path / "sync")
-    b, _ = load_full(tmp_path / "async")
+    sync_s, blocking_s = min(sync_samples), min(async_samples)
+
+    a, _ = load_full(tmp_path / "sync0")
+    b, _ = load_full(tmp_path / "async0")
     for k in state:
         assert torch.equal(a[k], b[k])
     assert blocking_s < sync_s, (
-        f"async save blocked {blocking_s*1e3:.1f} ms, sync save took {sync_s*1e3:.1f} ms"
+        f"async save blocked {blocking_s*1e3:.1f} ms, sync save took {sync_s*1e3:.1f} ms "
+        f"(best of 3; all samples async {[round(v*1e3, 1) for v in async_samples]} ms, "
+        f"sync {[round(v*1e3, 1) for v in sync_samples]} ms)"
     )
     print(f"\n[async ckpt] sync {sync_s*1e3:.1f} ms blocking, "
-          f"async {blocking_s*1e3:.1f} ms blocking + {saver.last_write_seconds*1e3:.1f} ms "
-          f"in the background ({sync_s/blocking_s:.1f}x less step time)")
+          f"async {blocking_s*1e3:.1f} ms blocking + {write_s*1e3:.1f} ms "
+          f"in the background ({sync_s/blocking_s:.1f}x less step time), best of 3")
 
 
 def test_async_save_surfaces_an_error_from_the_writer_thread(tmp_path: Path) -> None:
