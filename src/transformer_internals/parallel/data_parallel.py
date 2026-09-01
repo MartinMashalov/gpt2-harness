@@ -30,6 +30,7 @@ import torch.nn as nn
 
 from transformer_internals.parallel import comms
 from transformer_internals.parallel.common import identical_batch, identical_model, parallel_config
+from transformer_internals.precision import reduce_dtype_of
 
 __all__ = [
     "DEFAULT_BUCKET_BYTES",
@@ -97,6 +98,7 @@ def average_gradients(
     params: Iterable[nn.Parameter],
     world_size: int,
     bucket_bytes: int = DEFAULT_BUCKET_BYTES,
+    reduce_dtype: torch.dtype | str | None = None,
 ) -> int:
     """All-reduce every gradient and divide by the world size, in place.
 
@@ -108,10 +110,19 @@ def average_gradients(
         params: The replicated parameters.
         world_size: Ranks participating.
         bucket_bytes: Bucket cap; ``0`` means one collective per parameter.
+        reduce_dtype: Dtype the collective carries. ``None`` (default) keeps the
+            gradient's own dtype, which is fp32 everywhere in this repository.
+            Passing ``"bf16"`` casts the bucket down before the all-reduce and
+            back up after it, which halves the bytes on the wire and rounds
+            every rank's contribution to 8 significand bits before they are
+            summed. This is the same knob as FSDP's
+            ``MixedPrecision(reduce_dtype=...)``; the cost of choosing bf16 is
+            measured in ``results/parallel_comms.json`` rather than assumed.
 
     Returns:
         The number of collectives issued.
     """
+    dtype = reduce_dtype_of(reduce_dtype) if reduce_dtype is not None else None
     with_grad = [p for p in params if p.grad is not None]
     if not with_grad:
         return 0
@@ -122,7 +133,15 @@ def average_gradients(
     )
     for bucket in buckets:
         flat = torch.cat([p.grad.reshape(-1) for p in bucket])
-        comms.all_reduce(flat)
+        # The division by the world size happens in the accumulation dtype,
+        # after the cast back. Dividing inside the reduced dtype would round
+        # twice for no saving on the wire.
+        if dtype is not None and flat.dtype != dtype:
+            wire = flat.to(dtype)
+            comms.all_reduce(wire)
+            flat = wire.to(flat.dtype)
+        else:
+            comms.all_reduce(flat)
         flat.div_(world_size)
         offset = 0
         for p in bucket:
@@ -148,6 +167,7 @@ def ddp_equivalence_worker(
     seq: int = 16,
     steps: int = 3,
     bucket_bytes: int = DEFAULT_BUCKET_BYTES,
+    reduce_dtype: str | None = None,
     config_kwargs: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Run DDP for ``steps`` steps and compare against the single-process run.
@@ -158,6 +178,14 @@ def ddp_equivalence_worker(
     comparison is done on the flattened gradient of every parameter, and on the
     parameters themselves after an SGD step, so a sharding bug cannot hide in a
     parameter the loss happens to be insensitive to.
+
+    Args:
+        rank / world_size: Position in the group.
+        batch / seq: Global batch shape; this rank sees ``batch / world_size``.
+        steps: Optimiser steps to compare.
+        bucket_bytes: All-reduce bucket cap; ``0`` is one collective per tensor.
+        reduce_dtype: Dtype the gradient all-reduce carries. ``None`` is fp32.
+        config_kwargs: Overrides for the tested model.
 
     Returns:
         Per-step max absolute gradient error, the loss on both paths, and the
@@ -184,7 +212,9 @@ def ddp_equivalence_worker(
         ddp_opt.zero_grad(set_to_none=True)
         out = ddp_model(my_inputs, targets=my_targets)
         out["loss"].backward()
-        buckets = average_gradients(ddp_model.parameters(), world_size, bucket_bytes)
+        buckets = average_gradients(
+            ddp_model.parameters(), world_size, bucket_bytes, reduce_dtype=reduce_dtype
+        )
         comms.get_counter().steps += 1
 
         ref_opt.zero_grad(set_to_none=True)
@@ -205,6 +235,7 @@ def ddp_equivalence_worker(
 
     return {
         "rank": rank,
+        "reduce_dtype": reduce_dtype or "fp32",
         "max_grad_error": max(grad_errors),
         "max_param_error": max(param_errors),
         "grad_errors": grad_errors,

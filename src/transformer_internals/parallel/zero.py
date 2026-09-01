@@ -40,6 +40,41 @@ gathered parameters alive for the backward pass has ZeRO-3's communication cost
 and DDP's memory. Because the parameters are gone by the time the backward pass
 arrives, the unit's forward is recomputed there, which is exactly FSDP combined
 with activation checkpointing.
+
+Wire dtypes, and the fp32 master shard
+--------------------------------------
+Both optimizers take two independent dtype axes, matching FSDP's
+``MixedPrecision(param_dtype=..., reduce_dtype=...)``:
+
+* ``param_dtype`` is what the *parameter* all-gather carries.
+* ``reduce_dtype`` is what the *gradient* reduction carries.
+
+Neither of them is what the optimizer updates. Rank ``r`` holds a persistent
+**fp32 master shard** of its slice of the flat parameter vector, and every AdamW
+update is applied to that. This is the piece that makes bf16 collectives safe to
+use at all: a bf16 value carries 8 significand bits, an Adam update is commonly
+1e-4 of the weight it is added to, and adding those inside bf16 rounds the
+update away. Keeping the master in fp32 confines the bf16 rounding to the wire,
+where it is a one-off error per step rather than an error that compounds into
+the optimizer state.
+
+``results/parallel_comms.json`` measures what choosing bf16 on the wire actually
+costs, by running the same multi-step trajectory comparison at both dtypes.
+
+Gradient clipping is not a local operation
+------------------------------------------
+A global gradient-norm clip needs the norm over *every* parameter, and rank
+``r`` holds only its slice of the gradient. So a correct clip needs the ranks to
+agree on one number before any of them updates, which is an extra collective:
+each rank all-reduces its local sum of squares, takes the square root of the
+total, and scales its own shard by the same coefficient
+``torch.nn.utils.clip_grad_norm_`` would have used.
+
+The extra collective is tiny -- one fp32 scalar, 4 bytes -- and it is therefore
+pure latency, which is the expensive kind of collective. It is counted like
+every other collective in this repository, and ZeRO-1 does not pay it: stage 1
+all-reduces the *full* gradient anyway, so every rank can compute the global
+norm locally. That difference between the stages is measured, not asserted.
 """
 
 from __future__ import annotations
@@ -60,12 +95,15 @@ from transformer_internals.parallel.common import (
     state_bytes,
 )
 from transformer_internals.parallel.data_parallel import average_gradients, local_shard
+from transformer_internals.precision import reduce_dtype_of
 
 __all__ = [
     "ShardedAdamW",
     "Zero3Model",
     "adamw_update_",
+    "clip_coefficient",
     "decay_mask",
+    "global_grad_norm",
     "zero3_equivalence_worker",
     "zero_equivalence_worker",
 ]
@@ -145,6 +183,53 @@ def adamw_update_(
     step_size = lr / bias_correction1
     denom = (exp_avg_sq.sqrt() / math.sqrt(bias_correction2)).add_(eps)
     param.addcdiv_(exp_avg, denom, value=-step_size)
+
+
+# --------------------------------------------------------------------------- #
+# gradient clipping under sharding
+# --------------------------------------------------------------------------- #
+
+
+def global_grad_norm(
+    shard_sumsq: torch.Tensor,
+    replicated_sumsq: torch.Tensor | float = 0.0,
+    *,
+    reduce: bool,
+) -> torch.Tensor:
+    """The global gradient L2 norm, from a rank that holds only a slice of it.
+
+    Args:
+        shard_sumsq: Sum of squares of the gradient elements this rank *owns*,
+            which no other rank holds. Summed across ranks when ``reduce``.
+        replicated_sumsq: Sum of squares of gradients that are already identical
+            on every rank, such as ZeRO-3's root parameters after their
+            all-reduce. Added *after* the collective, deliberately: putting it
+            inside would count it ``p`` times and shrink the norm by a factor of
+            ``sqrt(p)`` on the replicated part, which is a bug that grows with
+            the world size and therefore passes on one GPU.
+        reduce: Whether the shard sums need a collective. False for ZeRO-1,
+            where every rank already holds the whole averaged gradient and can
+            compute the norm without talking to anyone.
+
+    Returns:
+        A scalar tensor: the global norm.
+    """
+    total = shard_sumsq.clone()
+    if reduce:
+        comms.all_reduce(total)
+    return (total + replicated_sumsq).sqrt()
+
+
+def clip_coefficient(total_norm: torch.Tensor, max_norm: float) -> torch.Tensor:
+    """The scale ``torch.nn.utils.clip_grad_norm_`` applies, to the letter.
+
+    ``max_norm / (total_norm + 1e-6)``, clamped at 1 and then applied
+    unconditionally. The clamp and the epsilon both matter for reproducing
+    torch's result exactly: an ``if norm > max_norm`` written by hand differs
+    from torch by the epsilon, which is small but not zero, and a trajectory
+    comparison over several steps will find it.
+    """
+    return torch.clamp(max_norm / (total_norm + 1e-6), max=1.0)
 
 
 # --------------------------------------------------------------------------- #

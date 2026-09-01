@@ -1,6 +1,6 @@
-# transformer-internals
+# gpt2-harness
 
-[![CI](https://github.com/MartinMashalov/transformer-internals/actions/workflows/ci.yml/badge.svg)](https://github.com/MartinMashalov/transformer-internals/actions/workflows/ci.yml)
+[![CI](https://github.com/MartinMashalov/gpt2-harness/actions/workflows/ci.yml/badge.svg)](https://github.com/MartinMashalov/gpt2-harness/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](pyproject.toml)
 [![PyTorch 2.2](https://img.shields.io/badge/PyTorch-2.2-ee4c2c.svg)](pyproject.toml)
@@ -1082,8 +1082,8 @@ Stated plainly, because the point of the repository is calibration.
 ## Quickstart
 
 ```bash
-git clone https://github.com/MartinMashalov/transformer-internals
-cd transformer-internals
+git clone https://github.com/MartinMashalov/gpt2-harness
+cd gpt2-harness
 make install          # creates .venv, installs with dev + verify extras
 
 make test-fast        # what CI runs: no weights, no network (60 s measured)

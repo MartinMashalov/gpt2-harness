@@ -188,7 +188,18 @@ class TrainConfig:
         betas / eps: AdamW moments.
         seed: Seeds Python, NumPy and torch, and controls the batch sampler.
         eval_interval / eval_batches: Held-out loss cadence and averaging.
-        amp: Use autocast where the device supports it.
+        amp: Run the forward pass under autocast. The parameters and the
+            optimiser state stay in fp32 whatever this is set to; see
+            :mod:`transformer_internals.precision` for why.
+        amp_dtype: ``"bf16"`` or ``"fp16"``. bf16 is the default and needs no
+            loss scaling; fp16 gets a ``GradScaler`` and is only reachable on
+            CUDA. Refused rather than silently downgraded where the device
+            cannot do it.
+        reduce_dtype: Dtype the gradient all-reduce carries in the data-parallel
+            paths, ``"fp32"`` (default), ``"bf16"`` or ``"fp16"``. Independent of
+            ``amp_dtype``: it halves the bytes on the wire and costs accuracy in
+            the reduction, which ``results/parallel_comms.json`` measures rather
+            than assumes.
     """
 
     steps: int = 600
@@ -206,6 +217,8 @@ class TrainConfig:
     eval_interval: int = 50
     eval_batches: int = 20
     amp: bool = False
+    amp_dtype: Literal["bf16", "fp16"] = "bf16"
+    reduce_dtype: Literal["fp32", "bf16", "fp16"] = "fp32"
     log_every: int = 50
     extra: dict[str, Any] = field(default_factory=dict)
 

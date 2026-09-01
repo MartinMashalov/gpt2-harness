@@ -27,6 +27,12 @@ import torch
 from transformer_internals.config import GPTConfig, TrainConfig
 from transformer_internals.data import TokenDataset
 from transformer_internals.model import GPT
+from transformer_internals.precision import (
+    autocast_context,
+    make_grad_scaler,
+    master_weight_report,
+    resolve_amp,
+)
 
 __all__ = ["TrainResult", "estimate_loss", "lr_at_step", "pick_device", "set_seed", "train"]
 
@@ -208,12 +214,15 @@ def train(
     train_gen = torch.Generator().manual_seed(cfg.seed)
     eval_gen_seed = cfg.seed + 10_000
 
-    # autocast is only enabled where it is actually a win and actually stable.
-    # On MPS, bf16 autocast in torch 2.2 silently changes numerics in LayerNorm;
-    # the ablation grid is small enough that fp32 costs little, and a comparison
-    # run under different numerics than the baseline is not a comparison.
-    use_amp = cfg.amp and device.type == "cuda"
-    scaler = torch.cuda.amp.GradScaler(enabled=use_amp and torch.cuda.is_available())
+    # Mixed precision is one decision, made once, in one place. See
+    # transformer_internals.precision for why bf16 needs no loss scaling and why
+    # the parameters stay in fp32 regardless of the compute dtype.
+    amp = resolve_amp(cfg.amp, cfg.amp_dtype, device)
+    # None unless the policy genuinely needs one, which is fp16 and only fp16.
+    # The previous version of this loop constructed a disabled GradScaler on
+    # every run and paired it with bf16 autocast, which is a no-op: bf16 has
+    # fp32's exponent range, so there is nothing for a scaler to rescale.
+    scaler = make_grad_scaler(amp)
 
     result = TrainResult(n_params=model.num_parameters())
     result.meta = {
@@ -222,6 +231,10 @@ def train(
         "torch": torch.__version__,
         "model_config": mcfg.to_dict(),
         "train_config": cfg.to_dict(),
+        "precision": amp.to_dict(),
+        # Measured, not asserted: what dtype the weights are actually in after
+        # the run has been set up.
+        "master_weights": master_weight_report(model),
     }
 
     start = time.perf_counter()
@@ -233,22 +246,33 @@ def train(
         opt.zero_grad(set_to_none=True)
         for _ in range(cfg.grad_accum):
             x, y = dataset.get_batch("train", cfg.batch_size, device=device, generator=train_gen)
-            if use_amp:
-                with torch.autocast(device_type=device.type, dtype=torch.bfloat16):
-                    loss = model(x, targets=y)["loss"]
-            else:
+            with autocast_context(amp):
                 loss = model(x, targets=y)["loss"]
+            # The loss leaves the autocast region before the backward pass. The
+            # backward runs under the dtypes autocast recorded on the graph, so
+            # wrapping it as well would change nothing and is a common confusion.
+            #
             # Divide by grad_accum so the accumulated gradient is the *mean* over
             # the effective batch, not the sum -- otherwise changing grad_accum
             # silently changes the effective learning rate.
-            scaler.scale(loss / cfg.grad_accum).backward()
+            scaled = loss / cfg.grad_accum
+            (scaler.scale(scaled) if scaler is not None else scaled).backward()
 
-        if use_amp:
+        if scaler is not None:
+            # Clipping has to see true gradients, so the loss scale comes out
+            # before the norm is taken. Without this the clip threshold would be
+            # compared against gradients multiplied by a scale that changes
+            # whenever the scaler backs off, which is not a threshold at all.
             scaler.unscale_(opt)
         grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.grad_clip)
         result.grad_norms.append(float(grad_norm))
-        scaler.step(opt)
-        scaler.update()
+        if scaler is None:
+            opt.step()
+        else:
+            # Skips the step when the unscaled gradients held an inf or a NaN,
+            # then adjusts the scale. This is the fp16 failure mode bf16 avoids.
+            scaler.step(opt)
+            scaler.update()
 
         result.tokens_seen += cfg.batch_size * cfg.grad_accum * cfg.block_size
         result.steps = step + 1
