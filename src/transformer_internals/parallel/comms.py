@@ -83,6 +83,7 @@ __all__ = [
     "all_gather_into",
     "all_gather_list",
     "all_reduce",
+    "barrier",
     "broadcast",
     "counter",
     "counter_scope",
@@ -349,6 +350,22 @@ def synchronize() -> None:
     without it, a timing measures how fast Python enqueued the kernels.
     """
     hardware.synchronize(common.current_device())
+
+
+def barrier(group: Any = None) -> None:
+    """A process-group barrier, told which device it is on.
+
+    ``dist.barrier()`` on NCCL has to pick a device to put its barrier
+    collective on. Left to guess it uses the current device, warns about
+    guessing, and picks wrong in any process that has touched more than one
+    device. Passing ``device_ids`` explicitly removes both the warning and the
+    guess. The argument is NCCL-only, so gloo gets the plain call.
+    """
+    device = common.current_device()
+    if device.type == "cuda":
+        dist.barrier(group=group, device_ids=[device.index or 0])
+    else:
+        dist.barrier(group=group)
 
 
 # --------------------------------------------------------------------------- #

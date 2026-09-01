@@ -151,6 +151,18 @@ def fit_link_model(
 # --------------------------------------------------------------------------- #
 
 
+def _barrier(device: torch.device) -> None:
+    """A barrier that tells NCCL which device it is on.
+
+    Without ``device_ids`` a NCCL barrier guesses from the current device and
+    warns about guessing. Gloo does not take the argument.
+    """
+    if device.type == "cuda":
+        dist.barrier(device_ids=[device.index or 0])
+    else:
+        dist.barrier()
+
+
 def _time_op(op: str, numel: int, world: int, device: torch.device, iters: int) -> dict[str, Any]:
     """Time one collective at one size, returning the samples and the bandwidths.
 
@@ -191,7 +203,7 @@ def _time_op(op: str, numel: int, world: int, device: torch.device, iters: int) 
     for _ in range(3):  # warm the connection, the allocator and the NCCL channels
         call()
     hardware.synchronize(device)
-    dist.barrier()
+    _barrier(device)
 
     samples: list[float] = []
     for _ in range(iters):
@@ -245,7 +257,7 @@ def _worker() -> None:
                 }
             )
         )
-    dist.barrier()
+    _barrier(device)
     dist.destroy_process_group()
 
 

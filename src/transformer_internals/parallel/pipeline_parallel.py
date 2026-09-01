@@ -32,7 +32,6 @@ from dataclasses import dataclass
 from typing import Any
 
 import torch
-import torch.distributed as dist
 import torch.nn as nn
 
 from transformer_internals.parallel import comms
@@ -370,7 +369,7 @@ def pipeline_worker(
     # m of them alive until its backward phase and 1F1B keeps at most p, which
     # is the difference the two schedules exist to make.
     meter = ActivationMeter(exclude=[*stage.parameters(), *stage.buffers()])
-    dist.barrier()
+    comms.barrier()
     t0 = time.perf_counter()
     with meter:
         loss_sum, peak_stash = _run_pipeline_step(
@@ -461,7 +460,7 @@ def bubble_scan_worker(
                 for p in stage.parameters():
                     p.grad = None
                 timer = _Timer()
-                dist.barrier()
+                comms.barrier()
                 t0 = time.perf_counter()
                 _loss, peak = _run_pipeline_step(
                     stage,
