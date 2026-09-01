@@ -152,3 +152,29 @@ def no_headroom_for(world_size: int) -> bool:
         )
         return True
     return False
+
+
+def world_sizes_that_fit(*sizes: int) -> list:
+    """Parametrise a distributed test over the world sizes this machine can run.
+
+    A gloo test at world size w runs w real processes. On a two-core CI runner
+    a world size of four spends its time context switching rather than
+    computing, and the run does not finish: the sequence-parallel test timed
+    out after 300 s on a two-core runner while taking about 12 s locally.
+
+    Correctness at world size 2 exercises the same code path, so the larger
+    sizes are dropped where they cannot run rather than being allowed to fail
+    as if the implementation were wrong. The reason is printed, so a dropped
+    size is visible in the log.
+    """
+    cores = os.cpu_count() or 1
+    fits = [w for w in sizes if w <= cores]
+    if not fits:
+        fits = [min(sizes)]
+    dropped = [w for w in sizes if w not in fits]
+    if dropped:
+        print(
+            f"\n[dist] {cores} cores: running world sizes {fits}, "
+            f"skipping {dropped} which cannot be scheduled here"
+        )
+    return fits

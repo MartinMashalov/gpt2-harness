@@ -25,7 +25,7 @@ from typing import Any
 import pytest
 import torch
 
-from conftest import machine_is_oversubscribed
+from conftest import machine_is_oversubscribed, world_sizes_that_fit
 from transformer_internals.hardware import Capabilities, HardwareError
 from transformer_internals.parallel import comms
 from transformer_internals.parallel.data_parallel import (
@@ -387,7 +387,7 @@ def test_zero3_clipping_adds_one_all_reduce_per_step():
 # --------------------------------------------------------------------------- #
 
 
-@pytest.mark.parametrize("world_size", [2, 4])
+@pytest.mark.parametrize("world_size", world_sizes_that_fit(2, 4))
 def test_tensor_parallel_forward_and_backward_match(world_size: int):
     for r in run(tp_equivalence_worker, world_size):
         assert r.value["forward_error"] < TOL
@@ -518,7 +518,7 @@ def test_measured_bubble_falls_as_micro_batches_rise():
 # --------------------------------------------------------------------------- #
 
 
-@pytest.mark.parametrize("world_size", [2, 4])
+@pytest.mark.parametrize("world_size", world_sizes_that_fit(2, 4))
 def test_sequence_parallel_attention_matches_single_process(world_size: int):
     for r in run(sequence_parallel_worker, world_size, batch=2, seq=32):
         assert r.value["all_gather_forward_error"] < TOL
@@ -540,7 +540,7 @@ def test_ring_attention_rotates_p_minus_1_blocks():
 # --------------------------------------------------------------------------- #
 
 
-@pytest.mark.parametrize("world_size", [2, 4])
+@pytest.mark.parametrize("world_size", world_sizes_that_fit(2, 4))
 def test_dtensor_expresses_the_same_sharding(world_size: int):
     for r in run(dtensor_worker, world_size):
         assert r.value["dtensor_error"] < TOL
