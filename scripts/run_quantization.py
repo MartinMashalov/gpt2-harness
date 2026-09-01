@@ -1,4 +1,4 @@
-"""Part 4: post-training quantization -- quality, size and speed tradeoff.
+"""Part 7: post-training quantization -- quality, size and speed tradeoff.
 
 int8 and int4, per-tensor against per-channel scales, each scored on held-out
 perplexity with error bars and measured on-disk size. Writes

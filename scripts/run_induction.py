@@ -1,4 +1,4 @@
-"""Part 3: find induction heads in GPT-2 small.
+"""Part 6: find induction heads in GPT-2 small.
 
 Writes ``results/induction.json``: per-head prefix-matching, previous-token,
 copying and causal-ablation scores, plus the in-context-learning curve.

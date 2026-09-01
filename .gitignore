@@ -34,3 +34,8 @@ wandb/
 ._*
 .Spotlight-V100
 .Trashes
+
+# ---- Build scratch ----
+# notes/ holds working notes written while building a part, for whoever
+# integrates it. They are not part of the published repository.
+notes/

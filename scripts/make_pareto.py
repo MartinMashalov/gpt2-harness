@@ -1,4 +1,4 @@
-"""Part 4: one quality/size frontier with every configuration on it.
+"""Part 7: one quality/size frontier with every configuration on it.
 
 This script deliberately re-evaluates every configuration itself rather than
 reading perplexities out of the other result files. Those scripts each use their

@@ -1,4 +1,4 @@
-"""Part 4: measure what the KV cache actually buys.
+"""Part 7: measure what the KV cache actually buys.
 
 Latency and throughput with and without the cache across context length, the
 exact cache-memory growth against model size, and the GQA/MQA reduction.

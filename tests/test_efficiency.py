@@ -1,4 +1,4 @@
-"""Part 4: quantization arithmetic, pruning masks, cache accounting, distillation."""
+"""Part 7: quantization arithmetic, pruning masks, cache accounting, distillation."""
 
 from __future__ import annotations
 

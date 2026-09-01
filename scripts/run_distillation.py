@@ -1,4 +1,4 @@
-"""Part 4: distil the verified GPT-2 teacher into a small student.
+"""Part 7: distil the verified GPT-2 teacher into a small student.
 
 Trains the same student twice under an identical budget -- once from scratch,
 once against the teacher's distribution -- and reports the gap.

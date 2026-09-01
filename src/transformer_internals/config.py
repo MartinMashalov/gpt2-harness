@@ -25,7 +25,7 @@ class GPTConfig:
     """Architecture of a GPT-2 style decoder-only transformer.
 
     The defaults are GPT-2 124M ("small") exactly as OpenAI released it. The
-    non-default options exist so that Part 3 of this repository can ablate one
+    non-default options exist so that Part 6 of this repository can ablate one
     design decision at a time; they are never used on the verification path.
 
     Attributes:

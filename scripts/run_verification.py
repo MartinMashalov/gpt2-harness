@@ -1,4 +1,4 @@
-"""Part 2: prove the implementation computes the same function as GPT-2.
+"""Part 5: prove the implementation computes the same function as GPT-2.
 
 Writes ``results/verification.json`` and prints the layer-by-layer table.
 """

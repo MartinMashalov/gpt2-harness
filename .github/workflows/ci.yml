@@ -41,9 +41,25 @@ jobs:
         # what remains still covers the tokenizer algorithm, the causal mask, the
         # naive-reference attention comparison, KV-cache equivalence, the
         # quantization arithmetic, pruning accounting and training determinism.
+        #
+        # It also covers the whole training-infrastructure half. Those tests
+        # start real `torch.distributed` process groups, but on the gloo backend
+        # with world sizes of 2 and 4, rendezvous through a FileStore or a
+        # loopback TCP port, and no GPU, no NCCL and no network access. They are
+        # the reason this workflow is worth running: the parallelism equivalence
+        # proofs are exactly the part that has to hold on any machine.
+        #
+        # Invoked as the bare `pytest` entry point on purpose, because that is
+        # what breaks differently from `python -m pytest`: the latter puts the
+        # working directory on sys.path and can mask a packaging mistake. The
+        # package is installed with `pip install -e .` above, so imports must
+        # resolve through the installed distribution and not through the cwd.
         env:
           PYTHONHASHSEED: "0"
         run: pytest -q -m "not weights" --durations=10
 
       - name: Figures redraw from the committed results
+        # All twelve figures, including the three from the training-infrastructure
+        # half, are drawn only from the JSON committed under results/. If this
+        # step fails, a figure is reading something that is not in the repository.
         run: python scripts/make_figures.py --assets /tmp/assets_ci

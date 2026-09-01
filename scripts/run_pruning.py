@@ -1,4 +1,4 @@
-"""Part 4: structured pruning of attention heads and MLP neurons.
+"""Part 7: structured pruning of attention heads and MLP neurons.
 
 Ranks heads and neurons by gradient-based importance, prunes at several
 sparsity levels, and tracks both held-out loss and the induction behaviour.

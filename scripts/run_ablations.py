@@ -1,4 +1,4 @@
-"""Part 3: train the ablation grid and write ``results/ablations.json``.
+"""Part 6: train the ablation grid and write ``results/ablations.json``.
 
 Nine configurations x three seeds, all under an identical budget and an identical
 data order. Reports mean +- standard deviation of final validation loss.

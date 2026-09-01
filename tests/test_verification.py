@@ -1,4 +1,4 @@
-"""Part 2: numerical equivalence against HuggingFace GPT-2.
+"""Part 5: numerical equivalence against HuggingFace GPT-2.
 
 Every test here is marked ``weights`` and is deselected in CI, which has neither
 the checkpoint nor the network. Locally they are the tests that matter most.

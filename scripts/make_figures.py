@@ -15,6 +15,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _common import ASSETS, RESULTS, read_json
 from transformer_internals import viz
+from transformer_internals.perf.plots import fig_roofline, fig_step_breakdown
+
+
+def _step_breakdown(payload: dict, path, web: bool = False):
+    """Adapter: the breakdown draws the ``reports`` list inside the diagnosis payload."""
+    return fig_step_breakdown(payload["reports"], path, web=web)
 
 # result file -> (figure function, output stem)
 FIGURES = [
@@ -27,6 +33,9 @@ FIGURES = [
     ("pruning.json", viz.fig_pruning_pareto, "pruning_pareto"),
     ("distillation.json", viz.fig_distillation, "distillation"),
     ("pareto.json", viz.fig_pareto, "pareto"),
+    ("parallel_comms.json", viz.fig_parallel_bubble, "parallel_bubble"),
+    ("roofline.json", fig_roofline, "roofline"),
+    ("diagnosis.json", _step_breakdown, "step_breakdown"),
 ]
 
 
