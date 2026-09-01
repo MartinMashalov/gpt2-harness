@@ -82,6 +82,31 @@ def fake_peak() -> MachinePeak:
 # ------------------------------------------------------------------ roofline
 
 
+def _machine_is_oversubscribed() -> bool:
+    """True when there are more runnable processes than cores.
+
+    A one-minute load average above the core count means every process is
+    waiting for a core, so a wall-clock difference of a few milliseconds is the
+    scheduler and not the thing under test. Used to gate timing assertions, and
+    only timing assertions. Returns False where the load average is unavailable,
+    which keeps the assertion on rather than off by default.
+    """
+    if not hasattr(os, "getloadavg"):
+        return False
+    try:
+        one_minute = os.getloadavg()[0]
+    except OSError:
+        return False
+    cores = os.cpu_count() or 1
+    if one_minute > cores:
+        print(
+            f"\n[timing] skipping the timing comparison: load average "
+            f"{one_minute:.1f} on {cores} cores"
+        )
+        return True
+    return False
+
+
 def test_ridge_point_is_the_ratio_of_the_two_peaks(fake_peak: MachinePeak) -> None:
     assert fake_peak.ridge_flops_per_byte == pytest.approx(
         fake_peak.peak_flops_per_s / fake_peak.peak_bytes_per_s
@@ -400,8 +425,14 @@ def test_diagnosis_finds_an_injected_dataloader_stall(fake_peak: MachinePeak) ->
 
     The stall is 200 ms against a model whose step is a couple of milliseconds,
     so the expected answer is known before the tool runs: the stall is almost the
-    whole step. The assertion has an order of magnitude of headroom, so it is not
-    a timing race.
+    whole step.
+
+    Almost, on a machine with a spare core. The compute half of the step is what
+    contention inflates, and on this laptop at a load average of 176 on ten cores
+    the step grew to about 90 ms and the stall came back as 0.69 of it rather
+    than 0.95. So there are two assertions: the stall is the majority of the step
+    on any machine, and it is nearly all of it on one that can measure. Which one
+    ran is printed.
     """
     report = diagnose(
         fake_peak,
@@ -418,9 +449,14 @@ def test_diagnosis_finds_an_injected_dataloader_stall(fake_peak: MachinePeak) ->
     top = report.findings[0]
     assert top.name == "dataloader stall"
     assert top.severity == "critical"
-    assert top.cost_fraction > 0.8
     assert top.evidence["injected_stall_ms"] == pytest.approx(200.0)
     assert top.recoverable
+    # Holds whatever else the machine is doing: contention inflates the compute
+    # half of the step, and it would have to inflate it past 200 ms to break
+    # this.
+    assert top.cost_fraction > 0.5, top.cost_fraction
+    if not _machine_is_oversubscribed():
+        assert top.cost_fraction > 0.8, top.cost_fraction
 
 
 def test_diagnosis_stays_quiet_when_the_loader_keeps_up(fake_peak: MachinePeak) -> None:
@@ -575,31 +611,6 @@ def test_report_serialises_to_json(fake_peak: MachinePeak) -> None:
 
 
 @pytest.mark.slow
-def _machine_is_oversubscribed() -> bool:
-    """True when there are more runnable processes than cores.
-
-    A one-minute load average above the core count means every process is
-    waiting for a core, so a wall-clock difference of a few milliseconds is the
-    scheduler and not the thing under test. Used to gate timing assertions, and
-    only timing assertions. Returns False where the load average is unavailable,
-    which keeps the assertion on rather than off by default.
-    """
-    if not hasattr(os, "getloadavg"):
-        return False
-    try:
-        one_minute = os.getloadavg()[0]
-    except OSError:
-        return False
-    cores = os.cpu_count() or 1
-    if one_minute > cores:
-        print(
-            f"\n[timing] skipping the timing comparison: load average "
-            f"{one_minute:.1f} on {cores} cores"
-        )
-        return True
-    return False
-
-
 def test_collective_probe_measures_real_ranks() -> None:
     """Two real gloo processes, four schedules, one gradient volume.
 
