@@ -18,17 +18,40 @@ from transformer_internals.config import GPTConfig
 def machine_is_oversubscribed() -> bool:
     """True when there are more runnable processes than cores.
 
-    Used to gate wall-clock assertions, and only wall-clock assertions. A
-    one-minute load average above the core count means every process is waiting
-    for a core, so a comparison between two measured times is a comparison of
+    Used to gate timing assertions, and only timing assertions. A one-minute
+    load average above the core count means every process is waiting for a
+    core, so a comparison between two measured times is a comparison of
     scheduler luck: on this laptop at a load average of 176 on ten cores, a
     step that normally takes 2 ms took 90, and the per-iteration spread on a
     25 ms collective step was 160 ms.
 
-    Every structural assertion runs regardless. What is gated is the handful of
-    assertions whose subject is a duration, and a gated one prints the load
-    average so a skipped comparison is visible in the log rather than silent.
-    An idle CI runner never trips it.
+    Not every assertion about a duration is gated, and an earlier commit
+    message (6b426d9, "one explicit gate for every wall-clock assertion in the
+    suite") overstated this. The rule the suite actually follows is two tiers:
+
+    * A loose bound with measured margin against contention, which runs
+      everywhere. Six of these: the prefetch speedup and the collective fit in
+      ``test_cluster.py``, and matmul's share of self time, the injected fetch
+      stall, the stall fraction of a healthy loader and the diagnosis cost
+      fraction in ``test_perf.py``. Every one was rerun on this laptop at load
+      averages between 168 and 239 on ten cores while writing this, and every
+      one passed with room: prefetch 1.89x to 2.18x against a bound of 1.3,
+      the collective fit R^2 0.973 to 0.991 against 0.9.
+    * A tight bound that contention can push you across, gated on this
+      function. Five of these, at four sites: matmul's share against the
+      runner-up and the diagnosis cost fraction above 0.8 in ``test_perf.py``,
+      the paired collective-probe median in ``test_perf.py``, and the two
+      bounds on the measured pipeline bubble in ``test_parallel.py``.
+
+    A third kind used to exist and no longer does: a comparison of two measured
+    durations with no margin at all. The async-checkpoint test asserted that an
+    overlapped save blocked for less time than a synchronous one, which is red
+    on any loaded machine and took a CI leg down. It now asserts that control
+    returns before the write completes, observed rather than timed.
+
+    A gated assertion prints the load average when it declines to measure, so a
+    skipped comparison is visible in the log rather than silent. An idle CI
+    runner never trips it.
 
     Returns False where the load average is unavailable, so the assertions are
     on by default rather than off.
