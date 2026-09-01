@@ -258,6 +258,11 @@ class ShardedAdamW:
         stage: 1 or 2.
         lr, betas, eps, weight_decay: AdamW hyper-parameters.
         decay_matmul_only: Apply weight decay only to ``dim >= 2`` tensors.
+        grad_clip: Global gradient-norm clip, or ``None`` for no clipping. Under
+            sharding this is not a local operation; see the module docstring.
+        reduce_dtype: Dtype the gradient reduction carries. ``None`` is fp32.
+        param_dtype: Dtype the parameter all-gather carries. ``None`` is fp32.
+            The master shard this optimizer updates is fp32 either way.
     """
 
     def __init__(
@@ -271,6 +276,9 @@ class ShardedAdamW:
         eps: float = 1e-8,
         weight_decay: float = 0.1,
         decay_matmul_only: bool = True,
+        grad_clip: float | None = None,
+        reduce_dtype: str | torch.dtype | None = None,
+        param_dtype: str | torch.dtype | None = None,
     ) -> None:
         if stage not in (1, 2):
             raise ValueError(f"ShardedAdamW implements stages 1 and 2, got {stage}")
@@ -282,6 +290,13 @@ class ShardedAdamW:
         self.beta1, self.beta2 = betas
         self.eps = eps
         self.step_count = 0
+        self.grad_clip = grad_clip
+        self.reduce_dtype = reduce_dtype_of(reduce_dtype)
+        self.param_dtype = reduce_dtype_of(param_dtype)
+        #: Norm of the *global* gradient at the last step, before clipping.
+        #: Recorded so the sharded clip can be compared against a single-process
+        #: one on the number itself and not only on the parameters it produced.
+        self.last_grad_norm: float = float("nan")
 
         self.numel = sum(p.numel() for p in self.params)
         self.padded = _padded_numel(self.numel, world_size)
@@ -305,11 +320,31 @@ class ShardedAdamW:
         self.exp_avg_sq = torch.zeros(self.shard_size, device=device)
         #: Stage 2 keeps the reduced gradient shard here and frees ``p.grad``.
         self.grad_shard = torch.zeros(self.shard_size, device=device)
+        #: The fp32 master copy of this rank's slice of the flat parameter
+        #: vector, updated in place every step. Persistent, rather than
+        #: re-derived from the replicated parameters each step, which is the
+        #: whole point: with ``param_dtype`` bf16 the replicated copies have been
+        #: through a bf16 all-gather and re-deriving from them would let that
+        #: rounding compound into the optimizer trajectory.
+        self.master_shard = (
+            _flatten([p.detach() for p in self.params], self.padded)[
+                self.shard_start : self.shard_start + self.shard_size
+            ]
+            .clone()
+            .float()
+        )
 
     # -- memory accounting ------------------------------------------------
 
     def state_bytes(self) -> int:
-        """Bytes of Adam moments this rank holds -- the ``8N/p`` of the ZeRO table."""
+        """Bytes of Adam moments this rank holds -- the ``8N/p`` of the ZeRO table.
+
+        The fp32 master shard is *not* counted here. It is a parameter copy, not
+        Adam state, and folding it into the optimizer figure would make the
+        sharded number look worse than the ZeRO formulas for a reason that has
+        nothing to do with ZeRO. It is reported on its own in
+        :meth:`resident_bytes`.
+        """
         return state_bytes([self.exp_avg, self.exp_avg_sq])
 
     def resident_bytes(self) -> dict[str, int]:
@@ -330,12 +365,14 @@ class ShardedAdamW:
             grad_bytes = state_bytes([p.grad for p in self.params if p.grad is not None])
         opt_bytes = self.state_bytes()
         decay_bytes = state_bytes([self.decay])
+        master_bytes = state_bytes([self.master_shard])
         return {
             "params": param_bytes,
             "grads": grad_bytes,
             "optimizer": opt_bytes,
+            "master_shard": master_bytes,
             "decay_mask": decay_bytes,
-            "total": param_bytes + grad_bytes + opt_bytes + decay_bytes,
+            "total": param_bytes + grad_bytes + opt_bytes + master_bytes + decay_bytes,
         }
 
     # -- the step ---------------------------------------------------------
@@ -345,33 +382,66 @@ class ShardedAdamW:
             p.grad = None
 
     def step(self) -> None:
-        """Reduce the gradients, update this rank's shard, re-gather parameters."""
+        """Reduce the gradients, clip, update this rank's shard, re-gather."""
         self.step_count += 1
         grads = [
             p.grad if p.grad is not None else torch.zeros_like(p) for p in self.params
         ]
         flat_grad = _flatten(grads, self.padded)
 
+        # Whether the gradient reduction needs a collective in a narrower dtype
+        # is a wire decision; the accumulation stays fp32 on both stages.
         if self.stage == 1:
             # Every rank ends up with the whole averaged gradient and then uses
             # 1/p of it. The wasted bytes are exactly what stage 2 removes.
-            comms.all_reduce(flat_grad)
+            if self.reduce_dtype != flat_grad.dtype:
+                wire = flat_grad.to(self.reduce_dtype)
+                comms.all_reduce(wire)
+                flat_grad = wire.to(torch.float32)
+            else:
+                comms.all_reduce(flat_grad)
             flat_grad.div_(self.world_size)
             self.grad_shard.copy_(
                 flat_grad[self.shard_start : self.shard_start + self.shard_size]
             )
+            # Stage 1 holds the entire averaged gradient, so the global norm is
+            # already computable here with no further communication.
+            local_sumsq = (
+                flat_grad.pow(2).sum() if self.grad_clip is not None else None
+            )
+            needs_norm_collective = False
         else:
-            comms.reduce_scatter_into(self.grad_shard, flat_grad)
+            if self.reduce_dtype != flat_grad.dtype:
+                wire_in = flat_grad.to(self.reduce_dtype)
+                wire_out = torch.empty(
+                    self.shard_size, dtype=self.reduce_dtype, device=flat_grad.device
+                )
+                comms.reduce_scatter_into(wire_out, wire_in)
+                self.grad_shard.copy_(wire_out.to(torch.float32))
+                del wire_in, wire_out
+            else:
+                comms.reduce_scatter_into(self.grad_shard, flat_grad)
             self.grad_shard.div_(self.world_size)
             # The full gradient is no longer needed anywhere on this rank.
             self.zero_grad()
+            # This rank owns a disjoint slice, so the sums have to be added up
+            # across ranks before anybody can clip. One extra collective, four
+            # bytes, all latency.
+            local_sumsq = (
+                self.grad_shard.pow(2).sum() if self.grad_clip is not None else None
+            )
+            needs_norm_collective = True
         del flat_grad
 
-        flat_param = _flatten([p.detach() for p in self.params], self.padded)
-        shard = flat_param[self.shard_start : self.shard_start + self.shard_size].clone()
+        # No clip, no collective. The norm is not computed at all when it would
+        # not be used, so turning clipping on is visible in the byte count.
+        if self.grad_clip is not None and local_sumsq is not None:
+            total_norm = global_grad_norm(local_sumsq, reduce=needs_norm_collective)
+            self.last_grad_norm = float(total_norm)
+            self.grad_shard.mul_(clip_coefficient(total_norm, self.grad_clip))
 
         adamw_update_(
-            shard,
+            self.master_shard,
             self.grad_shard,
             self.exp_avg,
             self.exp_avg_sq,
@@ -385,9 +455,12 @@ class ShardedAdamW:
 
         # Every rank needs every parameter for the next forward pass, so the
         # updated shards go back out. This all-gather is the second half of what
-        # DDP's all-reduce was doing all along.
-        gathered = torch.empty(self.padded, device=shard.device)
-        comms.all_gather_into(gathered, shard)
+        # DDP's all-reduce was doing all along. Under param_dtype=bf16 it is the
+        # collective that rounds; the master shard above is untouched by it.
+        gathered = torch.empty(
+            self.padded, dtype=self.param_dtype, device=self.master_shard.device
+        )
+        comms.all_gather_into(gathered, self.master_shard.to(self.param_dtype))
 
         offset = 0
         with torch.no_grad():
@@ -415,6 +488,16 @@ class _GatherRunFree(torch.autograd.Function):
     rank keeps only the shard it owns. The division by the world size turns the
     sum over ranks into the mean over the global batch, which is what makes this
     match a single-process run on the full batch.
+
+    ``param_dtype`` and ``reduce_dtype`` say what the two collectives carry.
+    Unlike :class:`ShardedAdamW`, where the parameters stay replicated and bf16
+    only ever touches the wire, here the gathered buffer *is* what the unit
+    computes with, so ``param_dtype`` sets the compute dtype of the block as
+    well. That is what FSDP's ``MixedPrecision(param_dtype=...)`` does, and it is
+    why the two implementations are worth measuring separately.
+
+    The shard itself, and therefore the optimizer's view of the parameters, stays
+    fp32 on both paths.
     """
 
     @staticmethod
@@ -425,38 +508,51 @@ class _GatherRunFree(torch.autograd.Function):
         module: nn.Module,
         meta: tuple[tuple[str, torch.Size, int], ...],
         world_size: int,
+        param_dtype: torch.dtype,
+        reduce_dtype: torch.dtype,
     ) -> torch.Tensor:
         ctx.module = module
         ctx.meta = meta
         ctx.world_size = world_size
+        ctx.param_dtype = param_dtype
+        ctx.reduce_dtype = reduce_dtype
+        ctx.input_dtype = x.dtype
         ctx.save_for_backward(x, shard)
         with torch.no_grad():
             full = torch.empty(
-                shard.numel() * world_size, dtype=shard.dtype, device=shard.device
+                shard.numel() * world_size, dtype=param_dtype, device=shard.device
             )
-            comms.all_gather_into(full, shard)
-            out = _run_unit(module, full, meta, x)
+            comms.all_gather_into(full, shard.to(param_dtype))
+            out = _run_unit(module, full, meta, x.to(param_dtype))
             del full
-        return out
+        # The residual stream leaves the unit in the dtype it entered in, so the
+        # replicated root of the model and the loss stay in fp32 whatever the
+        # blocks computed in.
+        return out.to(ctx.input_dtype)
 
     @staticmethod
     def backward(ctx: Any, grad_out: torch.Tensor):  # type: ignore[override]
         x, shard = ctx.saved_tensors
         world_size = ctx.world_size
+        param_dtype = ctx.param_dtype
         full = torch.empty(
-            shard.numel() * world_size, dtype=shard.dtype, device=shard.device
+            shard.numel() * world_size, dtype=param_dtype, device=shard.device
         )
-        comms.all_gather_into(full, shard)
+        comms.all_gather_into(full, shard.to(param_dtype))
         full.requires_grad_(True)
-        x_in = x.detach().requires_grad_(True)
+        x_in = x.detach().to(param_dtype).requires_grad_(True)
         with torch.enable_grad():
             out = _run_unit(ctx.module, full, ctx.meta, x_in)
-        grad_x, grad_full = torch.autograd.grad(out, [x_in, full], grad_outputs=grad_out)
-        grad_shard = torch.empty_like(shard)
-        comms.reduce_scatter_into(grad_shard, grad_full.contiguous())
+        grad_x, grad_full = torch.autograd.grad(
+            out, [x_in, full], grad_outputs=grad_out.to(param_dtype)
+        )
+        wire = grad_full.contiguous().to(ctx.reduce_dtype)
+        wire_shard = torch.empty(shard.numel(), dtype=ctx.reduce_dtype, device=shard.device)
+        comms.reduce_scatter_into(wire_shard, wire)
+        grad_shard = wire_shard.to(shard.dtype)
         grad_shard.div_(world_size)
-        del full, grad_full
-        return grad_x, grad_shard, None, None, None
+        del full, grad_full, wire, wire_shard
+        return grad_x.to(ctx.input_dtype), grad_shard, None, None, None, None, None
 
 
 def _run_unit(
@@ -492,13 +588,26 @@ class Zero3Model(nn.Module):
         model: A constructed :class:`~transformer_internals.model.GPT`. It is
             consumed, not copied.
         rank / world_size: Position in the group.
+        param_dtype: Dtype the per-unit parameter all-gather carries, and
+            therefore the dtype the unit computes in. ``None`` is fp32.
+        reduce_dtype: Dtype the per-unit gradient reduce-scatter carries.
+            ``None`` is fp32. The shards stay fp32 on both settings.
     """
 
-    def __init__(self, model: nn.Module, rank: int, world_size: int) -> None:
+    def __init__(
+        self,
+        model: nn.Module,
+        rank: int,
+        world_size: int,
+        param_dtype: str | torch.dtype | None = None,
+        reduce_dtype: str | torch.dtype | None = None,
+    ) -> None:
         super().__init__()
         self.model = model
         self.rank = rank
         self.world_size = world_size
+        self.param_dtype = reduce_dtype_of(param_dtype)
+        self.reduce_dtype = reduce_dtype_of(reduce_dtype)
 
         self.unit_meta: list[tuple[tuple[str, torch.Size, int], ...]] = []
         self.shards = nn.ParameterList()
@@ -556,7 +665,13 @@ class Zero3Model(nn.Module):
 
         for unit, block in enumerate(model.h):
             x = _GatherRunFree.apply(
-                x, self.shards[unit], block, self.unit_meta[unit], self.world_size
+                x,
+                self.shards[unit],
+                block,
+                self.unit_meta[unit],
+                self.world_size,
+                self.param_dtype,
+                self.reduce_dtype,
             )
 
         x = model.ln_f(x)
@@ -592,6 +707,20 @@ class Zero3AdamW:
     Unit shards need no gradient communication at all -- ``_GatherRunFree``
     already reduce-scattered them, so rank ``r``'s shard gradient is final.
     The replicated root parameters still need the ordinary DDP all-reduce.
+
+    Clipping is the one place the two kinds of parameter have to be handled
+    differently. The unit shards are disjoint across ranks, so their squared
+    norms must be summed by a collective; the root gradients have already been
+    all-reduced, so they are identical on every rank and adding them before that
+    collective would count them ``p`` times. They are therefore added after it.
+
+    Args:
+        model: The sharded model.
+        lr, betas, eps, weight_decay: AdamW hyper-parameters.
+        grad_clip: Global gradient-norm clip, or ``None``.
+        reduce_dtype: Dtype the *root* gradient all-reduce carries. The unit
+            gradients were already reduced inside the backward pass, in the
+            dtype the model was constructed with.
     """
 
     def __init__(
@@ -601,12 +730,17 @@ class Zero3AdamW:
         betas: tuple[float, float] = (0.9, 0.95),
         eps: float = 1e-8,
         weight_decay: float = 0.1,
+        grad_clip: float | None = None,
+        reduce_dtype: str | torch.dtype | None = None,
     ) -> None:
         self.model = model
         self.lr = lr
         self.beta1, self.beta2 = betas
         self.eps = eps
         self.weight_decay = weight_decay
+        self.grad_clip = grad_clip
+        self.reduce_dtype = reduce_dtype_of(reduce_dtype)
+        self.last_grad_norm: float = float("nan")
         self.step_count = 0
         self.state: dict[int, tuple[torch.Tensor, torch.Tensor]] = {}
         self.decay: dict[int, torch.Tensor] = {}
@@ -632,9 +766,37 @@ class Zero3AdamW:
         self.step_count += 1
         # Root parameters are replicated, so their gradients are per-rank
         # partials and need the DDP all-reduce.
-        average_gradients(self.model.root_params, self.model.world_size, bucket_bytes=0)
+        average_gradients(
+            self.model.root_params,
+            self.model.world_size,
+            bucket_bytes=0,
+            reduce_dtype=self.reduce_dtype,
+        )
+
+        coefficient = None
+        if self.grad_clip is not None:
+            device = self.model.shards[0].device
+            shard_sumsq = torch.zeros((), device=device)
+            for shard in self.model.shards:
+                if shard.grad is not None:
+                    shard_sumsq = shard_sumsq + shard.grad.pow(2).sum()
+            root_sumsq = sum(
+                (
+                    p.grad.pow(2).sum()
+                    for p in self.model.root_params
+                    if p.grad is not None
+                ),
+                torch.zeros((), device=device),
+            )
+            total_norm = global_grad_norm(shard_sumsq, root_sumsq, reduce=True)
+            self.last_grad_norm = float(total_norm)
+            coefficient = clip_coefficient(total_norm, self.grad_clip)
 
         with torch.no_grad():
+            if coefficient is not None:
+                for p in list(self.model.shards) + self.model.root_params:
+                    if p.grad is not None:
+                        p.grad.mul_(coefficient)
             for shard in self.model.shards:
                 if shard.grad is None:
                     continue
@@ -706,6 +868,9 @@ def zero_equivalence_worker(
     seq: int = 16,
     lr: float = 1e-3,
     weight_decay: float = 0.1,
+    grad_clip: float | None = None,
+    reduce_dtype: str | None = None,
+    param_dtype: str | None = None,
     config_kwargs: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Train with :class:`ShardedAdamW` and against single-process AdamW.
@@ -715,9 +880,23 @@ def zero_equivalence_worker(
     for several steps: a sharded optimizer that got the moments wrong still
     produces a plausible first step and diverges by the third.
 
+    Args:
+        rank / world_size: Position in the group.
+        stage: 1 or 2.
+        steps: Optimiser steps to compare.
+        batch / seq: Global batch shape.
+        lr / weight_decay: AdamW hyper-parameters, shared with the reference.
+        grad_clip: When set, both the sharded and the reference path clip to
+            this global norm, and the two norms are compared as well as the
+            parameters.
+        reduce_dtype / param_dtype: What the two collectives carry. ``None`` is
+            fp32 on both, which is the exact-equivalence configuration.
+        config_kwargs: Overrides for the tested model.
+
     Returns:
-        Per-step max absolute parameter error, and the measured resident bytes
-        for the sharded and replicated paths.
+        Per-step max absolute parameter error, the gradient norms both paths
+        computed, and the measured resident bytes for the sharded and
+        replicated paths.
     """
     config = parallel_config(**(config_kwargs or {}))
     inputs, targets = identical_batch(config, batch, seq)
@@ -735,6 +914,9 @@ def zero_equivalence_worker(
         lr=lr,
         betas=betas,
         weight_decay=weight_decay,
+        grad_clip=grad_clip,
+        reduce_dtype=reduce_dtype,
+        param_dtype=param_dtype,
     )
     ref_opt = _reference_adamw(ref, lr, betas, 1e-8, weight_decay)
 
@@ -744,6 +926,7 @@ def zero_equivalence_worker(
     baseline_opt = _reference_adamw(baseline, lr, betas, 1e-8, weight_decay)
 
     errors: list[float] = []
+    norms: list[dict[str, float]] = []
     for _ in range(steps):
         opt.zero_grad()
         model(my_inputs, targets=my_targets)["loss"].backward()
@@ -752,6 +935,12 @@ def zero_equivalence_worker(
 
         ref_opt.zero_grad(set_to_none=True)
         ref(inputs, targets=targets)["loss"].backward()
+        # The reference clips with torch's own utility, so the comparison is
+        # against the thing everyone actually calls rather than against a second
+        # hand-written norm.
+        if grad_clip is not None:
+            ref_norm = float(torch.nn.utils.clip_grad_norm_(ref.parameters(), grad_clip))
+            norms.append({"sharded": opt.last_grad_norm, "reference": ref_norm})
         ref_opt.step()
 
         # The replicated baseline exists only so the memory comparison is
@@ -789,9 +978,20 @@ def zero_equivalence_worker(
     return {
         "rank": rank,
         "stage": stage,
+        "grad_clip": grad_clip,
+        "reduce_dtype": reduce_dtype or "fp32",
+        "param_dtype": param_dtype or "fp32",
         "max_param_error": max(errors),
         "param_errors": errors,
+        "grad_norms": norms,
+        "max_grad_norm_error": (
+            max(abs(n["sharded"] - n["reference"]) for n in norms) if norms else None
+        ),
         "n_params": sum(p.numel() for p in model.parameters()),
+        # The scale the errors above should be read against. The largest
+        # parameter in this model is a LayerNorm gain at 1.0, and bf16's grid
+        # spacing there is 2^-8, which is what caps the param_dtype column.
+        "reference_param_scale": max(float(p.detach().abs().max()) for p in ref.parameters()),
         "shard_numel": opt.shard_size,
         "sharded_bytes": opt.resident_bytes(),
         "replicated_bytes": baseline_bytes,
@@ -806,6 +1006,9 @@ def zero3_equivalence_worker(
     seq: int = 16,
     lr: float = 1e-3,
     weight_decay: float = 0.1,
+    grad_clip: float | None = None,
+    reduce_dtype: str | None = None,
+    param_dtype: str | None = None,
     config_kwargs: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Train a :class:`Zero3Model` and compare with single-process AdamW.
@@ -823,13 +1026,27 @@ def zero3_equivalence_worker(
     my_targets = local_shard(targets, rank, world_size)
 
     betas = (0.9, 0.95)
-    model = Zero3Model(identical_model(config, seed=0), rank=rank, world_size=world_size)
-    opt = Zero3AdamW(model, lr=lr, betas=betas, weight_decay=weight_decay)
+    model = Zero3Model(
+        identical_model(config, seed=0),
+        rank=rank,
+        world_size=world_size,
+        param_dtype=param_dtype,
+        reduce_dtype=reduce_dtype,
+    )
+    opt = Zero3AdamW(
+        model,
+        lr=lr,
+        betas=betas,
+        weight_decay=weight_decay,
+        grad_clip=grad_clip,
+        reduce_dtype=reduce_dtype,
+    )
     ref = identical_model(config, seed=0)
     ref_opt = _reference_adamw(ref, lr, betas, 1e-8, weight_decay)
 
     errors: list[float] = []
     losses: list[float] = []
+    norms: list[dict[str, float]] = []
     for _ in range(steps):
         opt.zero_grad()
         out = model(my_inputs, targets=my_targets)
@@ -840,6 +1057,15 @@ def zero3_equivalence_worker(
 
         ref_opt.zero_grad(set_to_none=True)
         ref(inputs, targets=targets)["loss"].backward()
+        if grad_clip is not None:
+            norms.append(
+                {
+                    "sharded": opt.last_grad_norm,
+                    "reference": float(
+                        torch.nn.utils.clip_grad_norm_(ref.parameters(), grad_clip)
+                    ),
+                }
+            )
         ref_opt.step()
 
         worst = 0.0
@@ -863,10 +1089,18 @@ def zero3_equivalence_worker(
     resident = model.resident_bytes(opt.optimizer_tensors(), opt.constant_tensors())
     return {
         "rank": rank,
+        "grad_clip": grad_clip,
+        "reduce_dtype": reduce_dtype or "fp32",
+        "param_dtype": param_dtype or "fp32",
         "max_param_error": max(errors),
         "param_errors": errors,
+        "grad_norms": norms,
+        "max_grad_norm_error": (
+            max(abs(n["sharded"] - n["reference"]) for n in norms) if norms else None
+        ),
         "losses": losses,
         "n_params": sum(p.numel() for p in ref.parameters()),
+        "reference_param_scale": max(float(p.detach().abs().max()) for p in ref.parameters()),
         "n_block_params": sum(p.numel() for p in ref.h.parameters()),
         "sharded_bytes": resident,
         "n_units": len(model.shards),

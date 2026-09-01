@@ -202,6 +202,139 @@ def test_zero3_gathers_once_per_unit_per_pass():
 
 
 # --------------------------------------------------------------------------- #
+# 2b. what a bf16 wire costs
+# --------------------------------------------------------------------------- #
+
+
+def test_a_bf16_gradient_reduction_moves_exactly_half_the_bytes():
+    """Not an estimate. The counter records the buffer the collective was given."""
+    fp32 = run(ddp_equivalence_worker, 2, batch=8, seq=16, steps=3)[0]
+    bf16 = run(ddp_equivalence_worker, 2, batch=8, seq=16, steps=3, reduce_dtype="bf16")[0]
+    assert bf16.payload["payload_bytes_per_step"] * 2 == (
+        fp32.payload["payload_bytes_per_step"]
+    )
+    # And the same number of collectives, so the saving is bytes and not calls.
+    assert (
+        bf16.payload["per_collective"]["all_reduce"]["calls"]
+        == fp32.payload["per_collective"]["all_reduce"]["calls"]
+    )
+
+
+def test_a_bf16_gradient_reduction_costs_accuracy_and_the_cost_is_bounded():
+    """Halving the wire is not free, and the size of the bill is the result.
+
+    An fp32 all-reduce reproduces the single-process gradient to 3e-08, which is
+    float non-associativity and nothing else. A bf16 one rounds each rank's
+    contribution to 8 significand bits before summing, so the error rises by
+    about four orders of magnitude, to a few parts in ten thousand of the
+    gradient. Both bounds are asserted: the loose one because a bf16 reduction
+    that was accidentally still fp32 would pass a one-sided test, and the tight
+    one because that is the claim.
+    """
+    fp32 = run(ddp_equivalence_worker, 2, batch=8, seq=16, steps=3)[0].value
+    bf16 = run(
+        ddp_equivalence_worker, 2, batch=8, seq=16, steps=3, reduce_dtype="bf16"
+    )[0].value
+    assert fp32["max_grad_error"] < 1e-06
+    assert 1e-05 < bf16["max_grad_error"] < 1e-02
+
+
+@pytest.mark.parametrize("stage", [1, 2])
+def test_the_fp32_master_shard_stops_the_bf16_error_compounding(stage: int):
+    """The point of holding a master copy, stated as a measurement.
+
+    With the optimiser updating an fp32 master shard, a bf16 gradient reduction
+    injects a fresh rounding error every step and none of it accumulates in the
+    optimiser state. So the trajectory error should be flat across steps rather
+    than growing. The assertion is that step 4's error is no more than 1.5x step
+    1's; a run whose master state had been allowed to fall to bf16 would grow far
+    faster than that.
+    """
+    r = run(zero_equivalence_worker, 2, stage=stage, steps=4, reduce_dtype="bf16")[0].value
+    errors = r["param_errors"]
+    assert errors[0] > 1e-05, "the bf16 reduction did not perturb anything"
+    assert errors[-1] <= 1.5 * errors[0], errors
+
+
+# --------------------------------------------------------------------------- #
+# 2c. gradient clipping under sharding
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.parametrize("stage", [1, 2])
+def test_a_sharded_clip_reproduces_a_single_process_clip(stage: int):
+    """Rank r holds a slice of the gradient and still gets the global norm right.
+
+    Compared two ways, because either alone is weak. The norm itself must match
+    what ``torch.nn.utils.clip_grad_norm_`` computed over the whole model, and
+    the parameters after the clipped step must still match the reference
+    trajectory at the same tolerance as the unclipped one.
+    """
+    for r in run(zero_equivalence_worker, 2, stage=stage, steps=4, grad_clip=1.0):
+        assert r.value["max_grad_norm_error"] < 1e-05, r.value["grad_norms"]
+        assert r.value["max_param_error"] < TOL, r.value["param_errors"]
+
+
+def test_the_clip_actually_bites_on_at_least_one_step():
+    """A clip that never triggers proves nothing about the clip."""
+    norms = run(zero_equivalence_worker, 2, stage=2, steps=4, grad_clip=1.0)[0].value[
+        "grad_norms"
+    ]
+    assert any(n["reference"] > 1.0 for n in norms), norms
+
+
+def test_zero3_clips_shards_and_replicated_roots_consistently():
+    """ZeRO-3's two kinds of parameter need different treatment in one norm.
+
+    The unit shards are disjoint across ranks and must be summed; the root
+    parameters have already been all-reduced and would be counted p times if
+    they went into the same collective.
+    """
+    for r in run(zero3_equivalence_worker, 2, steps=3, grad_clip=1.0):
+        assert r.value["max_grad_norm_error"] < 1e-05, r.value["grad_norms"]
+        assert r.value["max_param_error"] < TOL, r.value["param_errors"]
+
+
+def test_clipping_costs_one_extra_collective_per_step_under_zero2_and_none_under_zero1():
+    """The whole reason to count bytes: the cost of clipping is not the same at
+    every stage, and it falls out of who holds the gradient.
+
+    ZeRO-1 all-reduces the full gradient anyway, so every rank can take the norm
+    locally. ZeRO-2 reduce-scatters, so each rank holds a disjoint slice and the
+    ranks have to agree on one scalar before any of them updates. That is one
+    extra all-reduce of four bytes per step: no bandwidth at all, pure latency,
+    which is the expensive kind.
+    """
+    z1_plain = run(zero_equivalence_worker, 2, stage=1, steps=4)[0].payload
+    z1_clip = run(zero_equivalence_worker, 2, stage=1, steps=4, grad_clip=1.0)[0].payload
+    z2_plain = run(zero_equivalence_worker, 2, stage=2, steps=4)[0].payload
+    z2_clip = run(zero_equivalence_worker, 2, stage=2, steps=4, grad_clip=1.0)[0].payload
+
+    def calls(payload, op):
+        rec = payload["per_collective"].get(op)
+        return 0 if rec is None else rec["calls"]
+
+    assert calls(z1_clip, "all_reduce") == calls(z1_plain, "all_reduce")
+    assert calls(z2_clip, "all_reduce") == calls(z2_plain, "all_reduce") + 4
+    # Four bytes a step, one fp32 scalar, and nothing else changed.
+    extra = z2_clip["per_collective"]["all_reduce"]["payload_bytes"]
+    assert extra == 4 * 4
+
+
+def test_zero3_clipping_adds_one_all_reduce_per_step():
+    plain = run(zero3_equivalence_worker, 2, steps=3)[0].payload
+    clipped = run(zero3_equivalence_worker, 2, steps=3, grad_clip=1.0)[0].payload
+    assert (
+        clipped["per_collective"]["all_reduce"]["calls"]
+        == plain["per_collective"]["all_reduce"]["calls"] + 3
+    )
+    assert (
+        clipped["per_collective"]["all_reduce"]["payload_bytes"]
+        == plain["per_collective"]["all_reduce"]["payload_bytes"] + 3 * 4
+    )
+
+
+# --------------------------------------------------------------------------- #
 # 3. tensor parallel
 # --------------------------------------------------------------------------- #
 
