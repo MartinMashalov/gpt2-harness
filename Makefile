@@ -69,7 +69,7 @@ preflight:  ## GPU -- what is this machine, and can it run the sweep
 dry-run:  ## GPU -- resolve every CUDA decision against a fabricated 8-GPU node, no CUDA touched
 	$(PY) scripts/gpu_preflight.py --dry-run --stub-gpus 8
 
-smoke:  ## GPU -- the whole infrastructure pipeline at tiny sizes (5-8 min measured, CPU)
+smoke:  ## GPU -- the whole infrastructure pipeline at tiny sizes (5-8 min, load-dependent)
 	./scripts/run_on_gpu.sh --smoke --infra-only --skip-install
 
 gpu:  ## GPU -- the full sweep on a rented box. See docs/GPU_RUN.md first.

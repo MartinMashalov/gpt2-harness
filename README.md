@@ -1386,7 +1386,7 @@ changes from modelled to measured.
 
 ```bash
 make dry-run          # resolve every CUDA decision against a fabricated 8-GPU node
-make smoke            # the whole infrastructure pipeline at tiny sizes (5-8 min measured)
+make smoke            # the whole infrastructure pipeline at tiny sizes (5-8 min, load-dependent)
 make preflight        # what is this machine, and can it run the sweep
 make gpu              # the full sweep: 17 stages, resumable, timed, diffed
 make compare          # what changed against the committed baseline
