@@ -292,11 +292,11 @@ three repeats. Measured bubble is `1 - sum(compute) / (p × makespan)`.
 
 | micro-batches | `(p-1)/(m+p-1)` | measured GPipe | measured 1F1B | GPipe stash | 1F1B stash |
 |---|---|---|---|---|---|
-| 1 | 0.750 | 0.752 | 0.751 | 1 | 1 |
-| 2 | 0.600 | 0.607 | 0.604 | 2 | 2 |
-| 4 | 0.429 | 0.436 | 0.438 | 4 | 4 |
-| 8 | 0.273 | 0.294 | 0.295 | 8 | **4** |
-| 16 | 0.158 | 0.200 | 0.195 | 16 | **4** |
+| 1 | 0.750 | 0.752 | 0.752 | 1 | 1 |
+| 2 | 0.600 | 0.605 | 0.607 | 2 | 2 |
+| 4 | 0.429 | 0.446 | 0.448 | 4 | 4 |
+| 8 | 0.273 | 0.306 | 0.307 | 8 | **4** |
+| 16 | 0.158 | 0.215 | 0.215 | 16 | **4** |
 
 The measured curve sits slightly above the formula and the gap grows with `m`,
 because the formula charges nothing for the gloo transfers or the
