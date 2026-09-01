@@ -76,7 +76,7 @@ the thing around it computes the same function.
 **Worst disagreement with the single-process reference, anywhere in the table
 below: 2.4e-06.** Source for every number here:
 [`results/parallel_comms.json`](results/parallel_comms.json), written by
-`make parallel` in 104 seconds.
+`make parallel` in 107 seconds.
 
 | strategy | what it shards | what it communicates per step | worst error vs one process | measured payload/rank/step | closed form, checked exactly |
 |---|---|---|---|---|---|
@@ -421,13 +421,13 @@ HBM **cannot be compute-bound on that hardware at any shape**. The quadratic
 term is in the numerator and the denominator at once, so growing `T` does not
 help.
 
-Put the bf16 intensity at this shape back through the roofline and it says how
-much of the machine those two operators can reach at best. On an H100 the bound
-is
+Put those intensities back through the roofline and they say how much of each
+machine the two operators can reach at best. In bf16, an H100's bound is
 `51.2 x 3350 GB/s = 172 TFLOP/s`, which is **17% of the 989 TFLOP/s dense
-peak**; on an A100, **33%**. On this machine the bound is 7.9 TFLOP/s against a
-6.5 TFLOP/s compute roof, so it is not the binding constraint at all and the
-same two operators are capped at 100%.
+peak**; an A100's is **33%**. On this machine the roofline was measured in fp32,
+so the consistent comparison is the fp32 one: `25.6 x 308 GB/s = 7.9 TFLOP/s`
+against a 6.5 TFLOP/s compute roof, which is not the binding constraint at all,
+so the same two operators are capped at 100%.
 
 That is the whole argument for fusing attention. Keeping the score tile in SRAM
 so it never crosses HBM removes the `B H T^2` term from the denominator, the
@@ -758,7 +758,7 @@ the hop count decide everything.
 The all-reduce fit above is one collective at one world size. The full sweep is
 in [`results/collective_bandwidth.json`](results/collective_bandwidth.json),
 written by `make collectives`. All-reduce, all-gather and reduce-scatter, over
-message sizes from 16 KB to 256 MB, at world sizes 2 and 4, reported in **bus
+message sizes from 16 KB to 64 MB, at world sizes 2 and 4, reported in **bus
 bandwidth**: algorithm bandwidth times the ring factor for the collective, with
 the size taken as the full unsharded buffer in every case. That is NCCL's own
 convention, and it is the one that makes three different collectives comparable,
@@ -807,10 +807,10 @@ fit into a `Link` and evaluating `all_reduce_time` at every point in the sweep
 
 The model was fitted to these points, so this is a check on its *form* and not a
 held-out prediction. The reading that matters is where it fails: within 2% on the
-four largest messages, and out by 27% at 262 KB, which is the latency-dominated
-end where the real cost is scheduling rather than either term. That failure is
-the model's own point, and it is the regime where GPUDirect and the hop count
-decide everything.
+three largest messages, 7% out at 1 MB, and 27% out at 262 KB, which is the
+latency-dominated end where the real cost is scheduling rather than either term.
+That failure is the model's own point, and it is the regime where GPUDirect and
+the hop count decide everything.
 
 One implementation detail worth stating because getting it wrong is invisible:
 `Link.latency_us` is a **per-hop** latency, and the intercept of a fit to
@@ -1364,7 +1364,7 @@ cd gpt2-harness
 make install          # creates .venv, installs with dev + verify extras
 
 make test-fast        # what CI runs: no weights, no network (60 s measured)
-make parallel         # Part 1: every parallelism strategy vs a single process (104 s measured)
+make parallel         # Part 1: every parallelism strategy vs a single process (107 s measured)
 make roofline         # Part 2: measured roofline, operator table, MFU (~3 min)
 make diagnose         # Part 3: inject four pathologies, find all four (~5 min)
 make cluster          # Part 4: reshard, kill a rank, restart, fit the collective model (28 s measured)
@@ -1472,18 +1472,18 @@ assets/            committed figures, each with a *_web.png variant
 deploy/            Slurm, Ray, Kubernetes, Dask, and the cgroups demo
 docs/CLUSTER.md    the harness write-up: design decisions and their reasoning
 docs/GPU_RUN.md    renting a GPU box: which shape, what it costs, what changes
-tests/             282 tests; the weight-dependent ones are marked `weights`
+tests/             298 tests; the weight-dependent ones are marked `weights`
 ```
 
 ## Tests
 
 ```
-pytest -q                    # 282 passed in 144 s
-pytest -q -m "not weights"   # 273 collected, what CI runs, offline, CPU-only
+pytest -q                    # 298 passed in 127 s
+pytest -q -m "not weights"   # 289 collected, what CI runs, offline, CPU-only
 ```
 
-203 of those tests cover the training-infrastructure half.
-`tests/test_parallel.py` (70) spawns real `torch.distributed` process groups and
+211 of those tests cover the training-infrastructure half.
+`tests/test_parallel.py` (72) spawns real `torch.distributed` process groups and
 compares every strategy against a single-process reference, and also measures
 what a bf16 wire costs and that a sharded gradient clip reproduces
 `torch.nn.utils.clip_grad_norm_`; `tests/test_cluster.py` (46) reshards
@@ -1494,16 +1494,19 @@ FLOP count against `6ND`, and that the diagnosis tool ranks an injected fault
 first. All of it runs offline on CPU with world sizes of 2 and 4, which is what
 lets CI run it on a runner with no GPU.
 
-Three files exist to keep the parts that will one day run on a GPU honest today.
+Four files exist to keep the parts that will one day run on a GPU honest today.
 `tests/test_hardware.py` (18) exercises every backend, placement and refusal
 decision against a fabricated eight-GPU node, so the CUDA branch's *logic* is
 tested even though its two torch calls are not.
-`tests/test_precision.py` (14) checks the mixed-precision policy table the same
+`tests/test_precision.py` (15) checks the mixed-precision policy table the same
 way and then measures the bf16 gradient against fp32 on CPU, where the code path
 is the same one CUDA takes.
-`tests/test_activation_memory.py` (16) asserts that the analytic activation
+`tests/test_activation_memory.py` (20) asserts that the analytic activation
 count equals the measured one **exactly**, to the byte, across eight
-architecture variants.
+architecture variants, and separately measures what bf16 autocast does to it.
+`tests/test_compare_results.py` (9) tests the gate the GPU run ends on, in both
+directions: tripling every equivalence error must pass, and one error at 0.5
+must fail.
 
 The rest includes: BPE round-trip *and* exact agreement with the reference
 segmentation; the causal mask asserted directly (no position attends to the

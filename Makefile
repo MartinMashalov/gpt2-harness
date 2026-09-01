@@ -48,7 +48,7 @@ distill:  ## PART 7 -- distil GPT-2 into a 4-layer student (20 min measured, CPU
 pareto:  ## PART 7 -- collect every configuration into one quality/size frontier
 	$(PY) scripts/make_pareto.py
 
-parallel:  ## PART 1 -- every parallelism strategy, proven against a single-process reference (104 s measured, CPU)
+parallel:  ## PART 1 -- every parallelism strategy, proven against a single-process reference (107 s measured, CPU)
 	$(PY) scripts/run_parallel.py
 
 roofline:  ## PART 2 -- measure the machine's roofline, place every op on it, report MFU (~3 min)

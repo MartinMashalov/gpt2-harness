@@ -177,9 +177,17 @@ Two columns of times, and they mean different things.
 
 **Measured on the M1 Max** is what the same stage takes on the machine this
 repository was written on. Those are real numbers: the top rows are from this
-session's runs and from `results/.run_state/timings.tsv`, and the Part 6 to 8
-rows are the runtimes the `Makefile` records for the same targets. One row says
-"not recorded" rather than guessing.
+session's runs and from the `results/.run_state/timings.tsv` that a run writes
+(generated, not committed, so it appears only after you run something), and the
+Part 6 to 8 rows are the runtimes the `Makefile` records for the same targets.
+One row says "not recorded" rather than guessing.
+
+**Two stages do not use the GPU at all, by design.** `cluster` measures
+resharding, an overlapped checkpoint, a streaming dataloader and a killed rank,
+all of which are disk and process behaviour; `diagnose` profiles a training
+step, and torch 2.2's profiler has no MPS backend, which is why the committed
+profile is a CPU one. Both hardcode gloo. Their budgets below are the same CPU
+work on a faster host CPU, not GPU work, which is why they are small.
 
 **Budget on 8x A100** is an *estimate*, not a measurement. Nothing in this
 repository has run on a GPU. The estimates come from what each stage is bound
@@ -193,7 +201,7 @@ a file.
 | stage | what it measures | measured on M1 Max | budget on 8x A100 | bound by |
 |---|---|---|---|---|
 | `preflight` | the machine, and every decision made from it | 4 s | under 1 min | nothing |
-| `tests` | 260 tests, including every equivalence proof | 2 min 9 s | 3 to 6 min | process startup for ~30 distributed spawns |
+| `tests` | 298 tests, including every equivalence proof | 2 min 9 s | 3 to 6 min | process startup for ~30 distributed spawns |
 | `parallel` | equivalence, byte counts, bf16 wire cost, sharded clipping, activation memory | 1 min 47 s | 5 to 15 min | NCCL group setup per spawn, which is slower than gloo's |
 | `collectives` | all-reduce, all-gather, reduce-scatter across sizes and world sizes 2, 4, 8 | seconds at 2 ranks | 5 to 15 min | the sweep itself; this is the stage the trip is for |
 | `cluster` | resharding, async checkpoints, streaming, a killed rank, the fitted link | 28 s | 2 to 5 min | disk, not the GPU |
@@ -320,9 +328,18 @@ python scripts/compare_results.py --baseline-git HEAD --current results
 
 Then, in order:
 
-1. **Check that no correctness invariant moved.** `compare_results.py` exits
-   non-zero if one did. An equivalence error or a byte count that differs
-   between gloo and NCCL is a bug, and finding it is worth the trip on its own.
+1. **Check that no correctness invariant broke.** `compare_results.py` exits
+   non-zero if one did. A byte count, a collective count or a formula check
+   that differs at all between gloo and NCCL is a bug, and finding it is worth
+   the trip on its own. Equivalence errors are floats and *will* move, because
+   NCCL does not reduce in gloo's order; what the gate checks there is that
+   they stay under the 1e-5 the tests assert, and it prints the ratio so a move
+   inside the tolerance is still visible.
+
+   Expect a block of `NEW KEYS` too, and it is not a problem.
+   `results/roofline.json` and `results/cluster.json` were written before those
+   scripts started recording an `environment` block, so the first run adds one
+   to each. That is provenance, not a measurement.
 2. **Replace the budget column in section 4** with the measured one from
    `results/.run_state/timings.tsv`.
 3. **Update the README's Limitations.** "No GPU cluster" and "Mixed precision is
