@@ -515,6 +515,59 @@ def test_prefetch_hides_read_latency_behind_the_training_step(tmp_path: Path) ->
 # ------------------------------------------------------- failure and restart
 
 
+def test_a_reserved_port_stays_reserved_and_free_port_alone_does_not() -> None:
+    """The rendezvous port is a check followed by a use, and this is the gap.
+
+    ``free_port`` binds port 0, reads the number and closes, so from the moment
+    it returns, nothing stops the kernel handing the same number to the next
+    caller. That is not hypothetical: the number comes from the ephemeral range
+    and a closed listener with no connections leaves no TIME_WAIT to hold it.
+    ``reserved_port`` keeps the socket open, which is the only thing that
+    actually reserves anything.
+    """
+    from transformer_internals.cluster.failure import free_port, port_is_free, reserved_port
+
+    with reserved_port() as port:
+        assert not port_is_free(port), "a held reservation must not be bindable"
+        assert port not in {free_port() for _ in range(50)}, (
+            "the kernel handed out a port that was still bound"
+        )
+    assert port_is_free(port), "the reservation must be released on exit"
+
+
+def test_launch_replaces_a_master_port_that_was_taken_after_it_was_chosen(
+    tmp_path: Path,
+) -> None:
+    """The last-moment re-test, which is what a launcher can do about the gap.
+
+    Without it a taken rendezvous port is indistinguishable downstream from a
+    worker crash: every rank exits non-zero and ``run_with_recovery`` answers a
+    port collision with a restart from a checkpoint.
+    """
+    from transformer_internals.cluster.failure import (
+        JobSpec,
+        _with_a_usable_master_port,
+        free_port,
+        port_is_free,
+        reserved_port,
+    )
+
+    common = {
+        "data_path": str(tmp_path / "corpus.bin"),
+        "ckpt_dir": str(tmp_path / "ck"),
+        "log_path": str(tmp_path / "log.jsonl"),
+    }
+    with reserved_port() as taken:
+        spec = JobSpec(master_port=taken, **common)
+        fixed = _with_a_usable_master_port(spec)
+        assert fixed.master_port != taken, "a taken port was handed to the workers"
+        assert port_is_free(fixed.master_port)
+
+    # A port that is still free is left alone, so the chosen one is not churned.
+    chosen = JobSpec(master_port=free_port(), **common)
+    assert _with_a_usable_master_port(chosen).master_port == chosen.master_port
+
+
 @pytest.mark.slow
 def test_killing_a_rank_and_resuming_reproduces_the_uninterrupted_loss_curve(tmp_path: Path) -> None:
     """Real processes, real gloo, real SIGKILL, real restart from disk.

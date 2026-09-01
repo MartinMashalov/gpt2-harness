@@ -40,7 +40,8 @@ import json
 import os
 import socket
 import time
-from dataclasses import asdict, dataclass, field
+from collections.abc import Iterator
+from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -64,14 +65,62 @@ from transformer_internals.cluster.streaming import (
 from transformer_internals.config import GPTConfig
 from transformer_internals.model import GPT
 
-__all__ = ["JobSpec", "RunReport", "free_port", "read_log", "run_with_recovery", "worker_main"]
+__all__ = [
+    "JobSpec",
+    "RunReport",
+    "free_port",
+    "port_is_free",
+    "read_log",
+    "reserved_port",
+    "run_with_recovery",
+    "worker_main",
+]
 
 
 def free_port() -> int:
-    """Ask the OS for a port nobody is using, then hand it to the workers."""
+    """Ask the OS for a port nobody is using, then hand it to the workers.
+
+    Binding port 0 and closing the socket is a check followed by a use, with a
+    gap in between: any process on the machine can take the number after the
+    close here and before rank 0's ``TCPStore`` binds it. The gap cannot be
+    closed from this function. The rendezvous port has to be bound by a child
+    process, a child cannot inherit this socket for that purpose, and gloo's
+    store sets ``SO_REUSEADDR`` rather than ``SO_REUSEPORT``, so holding the
+    socket open across the spawn would make the child fail instead of the race.
+
+    What can be done is to keep the number reserved for as long as the caller
+    is not ready, and to re-check it at the last moment. :func:`reserved_port`
+    is the first half, :func:`launch` does the second: it re-tests the port
+    immediately before spawning and picks another if it has gone.
+    """
+    with reserved_port() as port:
+        return port
+
+
+@contextlib.contextmanager
+def reserved_port() -> Iterator[int]:
+    """Yield a port that stays bound, and so unavailable to anyone else, until exit.
+
+    Use this instead of :func:`free_port` wherever the caller can hold the
+    reservation up to the moment of launch. While the socket is open the kernel
+    will not hand the same number to another ``bind(("", 0))`` on this machine,
+    which is the collision that actually happens: two ports picked in a row,
+    the first one closed, and the second call handed the same number back.
+    """
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
-        return int(s.getsockname()[1])
+        s.listen(1)
+        yield int(s.getsockname()[1])
+
+
+def port_is_free(port: int) -> bool:
+    """Whether ``port`` can be bound on the loopback interface right now."""
+    try:
+        with socket.socket() as s:
+            s.bind(("127.0.0.1", port))
+    except OSError:
+        return False
+    return True
 
 
 @dataclass
@@ -268,6 +317,30 @@ def _rank_env(rank: int, world_size: int, spec: JobSpec, spec_path: Path) -> dic
     return env
 
 
+def _with_a_usable_master_port(spec: JobSpec, attempts: int = 8) -> JobSpec:
+    """Re-test the rendezvous port at the last moment, and replace it if it has gone.
+
+    ``free_port`` hands back a number that was free when it was asked, which is
+    not the same as free now: the caller may have built a JobSpec, written a
+    corpus and slept through a previous attempt in between. Rank 0 binding a
+    port somebody else took is not a distinguishable failure downstream, it is
+    just every rank exiting non-zero, which ``run_with_recovery`` would read as
+    a worker crash and answer with a pointless restart.
+
+    So the port is re-tested here, microseconds before the spawn, and a taken
+    one is replaced. That does not make the check-then-use atomic, and nothing
+    available to a child process can; it takes the window from "however long
+    the caller took" down to the spawn itself.
+    """
+    if spec.master_port and port_is_free(spec.master_port):
+        return spec
+    for _ in range(attempts):
+        port = free_port()
+        if port_is_free(port):
+            return replace(spec, master_port=port)
+    raise OSError(f"no free loopback port after {attempts} attempts")
+
+
 def launch(
     world_size: int, spec: JobSpec, *, kill_rank_at_step: tuple[int, int] | None = None,
     timeout_s: float = 300.0,
@@ -293,6 +366,7 @@ def launch(
     """
     import subprocess
 
+    spec = _with_a_usable_master_port(spec)
     spec_path = Path(spec.ckpt_dir).parent / f"jobspec_{spec.master_port}.json"
     spec_path.parent.mkdir(parents=True, exist_ok=True)
     spec_path.write_text(json.dumps(spec.to_dict()))

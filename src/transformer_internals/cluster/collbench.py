@@ -323,7 +323,6 @@ def run(
     env.update(
         {
             "MASTER_ADDR": "127.0.0.1",
-            "MASTER_PORT": str(free_port()),
             "WORLD_SIZE": str(world_size),
             "TI_SIZES": ",".join(str(s) for s in sizes),
             "TI_OPS": ",".join(ops),
@@ -333,6 +332,10 @@ def run(
             "OMP_NUM_THREADS": "1",
         }
     )
+    # Chosen here rather than with the rest of the environment above, because
+    # the number free_port() returns stops being reserved the moment it returns
+    # and backend detection sits in between. See failure.free_port.
+    env["MASTER_PORT"] = str(free_port())
     procs = []
     for r in range(world_size):
         e = dict(env)
