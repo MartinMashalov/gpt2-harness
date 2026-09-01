@@ -322,9 +322,19 @@ def test_profile_partitions_the_step_and_writes_a_loadable_trace(tmp_path: Path)
 
 
 def test_matmul_dominates_a_transformer_step_on_cpu() -> None:
-    """The claim the roofline makes about where FLOPs live, checked against a profile."""
-    cfg = GPTConfig(vocab_size=256, n_positions=64, n_layer=2, n_head=4, n_embd=128, dropout=0.0)
-    report = profile_training_step(cfg, batch=4, seq=64, device="cpu", active_steps=1)
+    """The claim the roofline makes about where FLOPs live, checked against a profile.
+
+    The shape matters and used to be too small. At 128 wide, batch 4, sequence
+    64, the GEMMs are small enough that operator dispatch is a large share of
+    the step and matmul came in at 0.36 of self time on an idle machine and
+    0.28 on a loaded one, which failed. At 256 wide, batch 8, sequence 128 it is
+    0.63, and the profile is faster to collect (0.8 s against 1.7 s) because
+    there is less dispatch to record. The threshold below is unchanged; what
+    changed is that the shape is now representative of what the committed
+    profile measures rather than of Python's overhead.
+    """
+    cfg = GPTConfig(vocab_size=256, n_positions=128, n_layer=2, n_head=4, n_embd=256, dropout=0.0)
+    report = profile_training_step(cfg, batch=8, seq=128, device="cpu", active_steps=1)
     top = report.categories[0]
     assert top["category"] == "matmul"
     assert top["self_fraction"] > 0.3
