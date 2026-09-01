@@ -1001,11 +1001,17 @@ Two honest negatives:
   (0.552)**, with 17% of all heads above 0.1 against a median of 0.001. But all
   five prefix-matching heads score essentially zero on it (L5H5: 0.008, L7H2:
   0.000). Folding the LayerNorm gains into the circuit does not rescue the
-  induction heads, they stay at **0.005 or below**, though it does move
-  individual heads by up to 0.426 and shifts the ranking (rank correlation
-  0.879), so it is a real refinement rather than a no-op. Both versions are
-  computed and committed (`copying`, `copying_ln_folded` in
-  [`results/induction.json`](results/induction.json)). The construction only sees
+  induction heads, they stay at **0.005 or below**, though it is not a no-op:
+  individual heads move by up to 0.426, and the ranking shifts, at a Spearman
+  rank correlation of **0.947** between the folded and unfolded maps over all
+  144 heads. Ties are averaged there, which is not a detail, because most heads
+  score exactly 0.000 on both. Both versions are computed and committed
+  (`copying`, `copying_ln_folded` in
+  [`results/induction.json`](results/induction.json)), and so is the
+  correlation between them (`copying_ln_fold_rank_correlation`), which
+  `rank_correlation` in
+  [`src/transformer_internals/induction.py`](src/transformer_internals/induction.py)
+  recomputes from those two committed maps in a test. The construction only sees
   the *direct* path to the unembedding, whereas an
   induction head writes into a residual stream that later layers read and
   transform, so "attends to the right place" and "copies via its own direct

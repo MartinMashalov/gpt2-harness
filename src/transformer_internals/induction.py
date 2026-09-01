@@ -66,9 +66,48 @@ __all__ = [
     "in_context_learning_curve",
     "make_repeated_sequence",
     "prefix_matching_scores",
+    "rank_correlation",
     "score_heads",
     "second_copy_loss",
 ]
+
+
+def rank_correlation(a: torch.Tensor, b: torch.Tensor) -> float:
+    """Spearman rank correlation between two per-head score maps.
+
+    Spearman rather than Pearson because the question the two copying scores
+    are being compared on is whether folding the LayerNorm gains in *reorders*
+    the heads, not whether it rescales them.
+
+    Ties are averaged, which matters here and is not a detail: most heads score
+    exactly 0.000 on both maps, and breaking those ties by index instead would
+    move the answer by 0.002 for no reason anyone could defend.
+
+    Args:
+        a, b: Tensors of the same shape. Flattened before ranking, so a
+            ``(n_layer, n_head)`` map is ranked over all its heads at once.
+
+    Returns:
+        The correlation in ``[-1, 1]``.
+    """
+    if a.shape != b.shape:
+        raise ValueError(f"shapes differ: {tuple(a.shape)} against {tuple(b.shape)}")
+    ranks = [_average_ranks(t.flatten().to(torch.float64)) for t in (a, b)]
+    x, y = (r - r.mean() for r in ranks)
+    return float(x.dot(y) / torch.sqrt(x.dot(x) * y.dot(y)))
+
+
+def _average_ranks(flat: torch.Tensor) -> torch.Tensor:
+    """1-based ranks, with tied values sharing the mean of the ranks they span."""
+    order = torch.argsort(flat, stable=True)
+    ordered = flat[order]
+    ranks = torch.empty_like(flat)
+    start = 0
+    for stop in range(1, len(ordered) + 1):
+        if stop == len(ordered) or ordered[stop] != ordered[start]:
+            ranks[order[start:stop]] = (start + stop - 1) / 2.0 + 1.0
+            start = stop
+    return ranks
 
 
 @dataclass
@@ -136,6 +175,14 @@ class InductionScores:
             "copying": self.copying.tolist(),
             "copying_ln_folded": (
                 self.copying_ln_folded.tolist() if self.copying_ln_folded is not None else None
+            ),
+            # Computed rather than eyeballed: the claim the README makes about
+            # the LayerNorm fold being a refinement and not a reordering is this
+            # number, and it has to come from a file.
+            "copying_ln_fold_rank_correlation": (
+                rank_correlation(self.copying, self.copying_ln_folded)
+                if self.copying_ln_folded is not None
+                else None
             ),
             "chance_level": self.chance_level,
             "ablation": self.ablation.tolist() if self.ablation is not None else None,

@@ -15,7 +15,11 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _common import RESULTS, device_from_arg, get_gpt2, write_json
-from transformer_internals.induction import in_context_learning_curve, score_heads
+from transformer_internals.induction import (
+    in_context_learning_curve,
+    rank_correlation,
+    score_heads,
+)
 
 
 def main() -> int:
@@ -62,7 +66,9 @@ def main() -> int:
             f"{folded.max():.4f}, max among the 5 top prefix-matching heads "
             f"{max(folded[layer, head] for layer, head in ind):.4f} "
             f"(unfolded {max(plain[layer, head] for layer, head in ind):.4f}); "
-            f"largest per-head shift {(folded - plain).abs().max():.4f}"
+            f"largest per-head shift {(folded - plain).abs().max():.4f}; "
+            f"Spearman rank correlation with the unfolded map "
+            f"{rank_correlation(plain, folded):.3f}"
         )
 
     print("\ntop previous-token heads (the other half of the circuit):")

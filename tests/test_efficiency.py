@@ -271,3 +271,49 @@ def test_distillation_runs_and_learns() -> None:
     _, r = train_student(cfg, tcfg, dataset, teacher=teacher, alpha=0.5, device="cpu")
     assert math.isfinite(r.final_val_loss)
     assert len(r.history) >= 2
+
+
+# ------------------------------------------------------------------- induction
+
+
+def test_rank_correlation_averages_ties_and_hits_a_hand_computed_answer() -> None:
+    """Ties are the whole reason this is not a two-line call to a library.
+
+    Most heads score exactly 0.000 on both copying maps, so how ties are handled
+    decides the third decimal place of the number the README quotes.
+    """
+    from transformer_internals.induction import rank_correlation
+
+    assert rank_correlation(torch.arange(10.0), torch.arange(10.0)) == 1.0
+    assert rank_correlation(torch.arange(10.0), torch.arange(10.0).flip(0)) == -1.0
+
+    # a ranks 1, 2.5, 2.5, 4; b ranks 1.5, 1.5, 3, 4. Pearson on those is
+    # 3.75 / 4.5 by hand.
+    a = torch.tensor([1.0, 2.0, 2.0, 3.0])
+    b = torch.tensor([1.0, 1.0, 2.0, 3.0])
+    assert rank_correlation(a, b) == pytest.approx(3.75 / 4.5)
+
+    with pytest.raises(ValueError, match="shapes differ"):
+        rank_correlation(torch.zeros(3), torch.zeros(4))
+
+
+def test_the_layernorm_fold_correlation_recomputes_from_the_committed_scores() -> None:
+    """The README quotes this number; this is the file it has to come from.
+
+    Both copying maps are committed in ``results/induction.json``, so the
+    correlation between them is not a measurement, it is a computation over a
+    committed file, and it has to still be the computation the file says it is.
+    """
+    import json
+    from pathlib import Path
+
+    from transformer_internals.induction import rank_correlation
+
+    payload = json.loads(
+        (Path(__file__).resolve().parents[1] / "results" / "induction.json").read_text()
+    )
+    recomputed = rank_correlation(
+        torch.tensor(payload["copying"]), torch.tensor(payload["copying_ln_folded"])
+    )
+    assert recomputed == pytest.approx(payload["copying_ln_fold_rank_correlation"], abs=1e-12)
+    assert round(recomputed, 3) == 0.947, "the README quotes 0.947"
