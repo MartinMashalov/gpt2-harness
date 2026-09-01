@@ -1,0 +1,77 @@
+### docker run --memory=512m --memory-swap=512m --cpus=1.5
+### (memory-swap == memory means swap is disabled for the cgroup)
+cgroup v2 limits for this process
+============================================================
+cgroup path        : /
+memory.max         : 536870912 bytes (0.50 GiB)
+memory.high        : max (no limit at this level; the real ceiling is an ancestor cgroup or the host)
+memory.current     : 23445504 bytes (0.02 GiB)
+memory.swap.max    : 0 bytes (0.00 GiB)
+pids.max           : max
+cpu.max            : 150000 100000
+                     150000us of CPU time per 100000us period = 1.50 CPUs' worth. Going over does not fail the process, it throttles it until the next period.
+
+memory.events (counters since this cgroup was created):
+  low 0
+  high 0
+  max 0
+  oom 0
+  oom_kill 0
+  oom_group_kill 0
+cpu.stat:
+  usage_usec 119430
+  user_usec 99868
+  system_usec 19561
+  core_sched.force_idle_usec 0
+  nr_periods 2
+  nr_throttled 0   <- non-zero means the CPU quota is being hit
+  throttled_usec 0   <- non-zero means the CPU quota is being hit
+  nr_bursts 0
+  burst_usec 0
+
+Headroom           : 490 MiB (4.4% of memory.max in use)
+
+What happens to a training job at each wall:
+  memory.max  hard. The cgroup OOM killer picks a process in this cgroup and
+              SIGKILLs it. No Python exception, no traceback: the rank just
+              disappears and the launcher sees exit code -9. Check
+              memory.events' oom_kill counter to tell this apart from a
+              hardware or network failure.
+  memory.high soft. No kill; the cgroup is throttled into reclaim and the
+              step time inflates. This is a throughput bug, not a crash.
+  swap        memory.swap.max is 0 here, so there is no paging escape hatch:
+              the job hits memory.max and dies rather than going slow. For a
+              collective-synchronised job that is the better failure -- one
+              rank paging to disk stalls every other rank at the next
+              all-reduce, and a hang is harder to diagnose than a kill.
+  cpu.max     quota, not a kill. Throttling shows up in cpu.stat and looks
+              like a slow dataloader, which looks like a slow GPU.
+
+### Now allocate past memory.max inside the same limits.
+### Expect: no Python traceback, exit code 137 (128 + SIGKILL).
+allocated 64 MiB
+allocated 128 MiB
+allocated 192 MiB
+allocated 256 MiB
+allocated 320 MiB
+allocated 384 MiB
+allocated 448 MiB
+### exit code: 137
+
+### Does swap change the failure mode? First, is there a swap device at all
+### in the kernel this container runs on?
+cgroup memory.swap.max: 536870912
+SwapTotal:             0 kB
+
+### Same overshoot, cgroup now allowed 512m swap on top of 512m memory.
+touched 64 MiB
+touched 128 MiB
+touched 192 MiB
+touched 256 MiB
+touched 320 MiB
+touched 384 MiB
+touched 448 MiB
+### exit code: 137
+### Read that against SwapTotal above: raising the cgroup's swap allowance
+### does nothing if the kernel has no swap device to page to. The limit is
+### permission, not capacity.

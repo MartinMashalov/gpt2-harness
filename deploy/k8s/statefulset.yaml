@@ -1,0 +1,109 @@
+# The same job as a StatefulSet instead of a Job.
+#
+# When to prefer this: a StatefulSet gives stable pod identities (gpt-train-0,
+# gpt-train-1, ...) and stable per-pod PersistentVolumeClaims. That matters when
+# each rank writes its own checkpoint shard -- with a Job, a rescheduled pod
+# gets a new name and cannot find the shard its predecessor wrote, so every rank
+# has to write to shared storage. With a StatefulSet, rank 3 always comes back
+# as gpt-train-3 with gpt-train-3's disk attached, and a resharding-free restart
+# is possible.
+#
+# What you give up: a StatefulSet has no notion of completion. It restarts pods
+# forever, so the training script has to exit 0 and the operator has to scale it
+# to zero. For a job that ends, use the Job. For a long-lived run that is
+# restarted often, this is the friendlier shape.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: gpt-train
+spec:
+  serviceName: gpt-train
+  replicas: 8
+  # All ranks come up together or not at all: a rolling start would leave the
+  # rendezvous waiting one pod at a time.
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels:
+      app: gpt-train
+  volumeClaimTemplates:
+    - metadata:
+        name: rank-checkpoint
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: local-nvme
+        resources:
+          requests:
+            storage: 2Ti
+  template:
+    metadata:
+      labels:
+        app: gpt-train
+    spec:
+      schedulerName: volcano
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: gpt-train
+              topologyKey: kubernetes.io/hostname
+      topologySpreadConstraints:
+        # Spread across racks only as far as the fabric allows: whenUnsatisfiable
+        # ScheduleAnyway means "prefer, do not block". A DoNotSchedule here would
+        # deadlock the job when a rack is full.
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: gpt-train
+      volumes:
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 64Gi
+        - name: data
+          persistentVolumeClaim:
+            claimName: training-corpus
+      containers:
+        - name: trainer
+          image: ghcr.io/example/transformer-internals:latest
+          command: ["/bin/bash", "-lc"]
+          args:
+            - |
+              RANK_INDEX="${HOSTNAME##*-}"
+              exec torchrun \
+                --nnodes=8 --nproc-per-node=8 --node-rank="$RANK_INDEX" \
+                --rdzv-backend=c10d \
+                --rdzv-endpoint=gpt-train-0.gpt-train:29500 \
+                --rdzv-id=gpt-train --max-restarts=3 \
+                -m transformer_internals.cluster.failure
+          env:
+            - name: NCCL_DEBUG
+              value: INFO
+            - name: NCCL_NET_GDR_LEVEL
+              value: "2"
+            - name: TORCH_NCCL_ASYNC_ERROR_HANDLING
+              value: "1"
+          resources:
+            requests:
+              cpu: "96"
+              memory: 900Gi
+              nvidia.com/gpu: "8"
+              rdma/hca_shared_devices_a: "1"
+            limits:
+              cpu: "96"
+              memory: 900Gi
+              nvidia.com/gpu: "8"
+              rdma/hca_shared_devices_a: "1"
+          securityContext:
+            capabilities:
+              add: ["IPC_LOCK"]
+          volumeMounts:
+            - name: dshm
+              mountPath: /dev/shm
+            - name: rank-checkpoint
+              mountPath: /checkpoints
+            - name: data
+              mountPath: /data
+              readOnly: true

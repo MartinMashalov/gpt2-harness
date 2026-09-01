@@ -1,0 +1,246 @@
+{
+  "resharding": {
+    "parameters": 124439808,
+    "tensors": 149,
+    "save_seconds": 3.4198690420016646,
+    "shard_bytes": [
+      397197350,
+      397197350,
+      397197350,
+      397197350
+    ],
+    "total_on_disk_bytes": 1588789400,
+    "state_dict_bytes": 652148736,
+    "step_in_index": 100,
+    "reshards": [
+      {
+        "from_world_size": 4,
+        "to_world_size": 1,
+        "seconds": 0.24660241603851318,
+        "shard_file_opens": 4,
+        "bitwise_identical": true
+      },
+      {
+        "from_world_size": 4,
+        "to_world_size": 2,
+        "seconds": 0.32573912502266467,
+        "shard_file_opens": 4,
+        "bitwise_identical": true
+      },
+      {
+        "from_world_size": 4,
+        "to_world_size": 8,
+        "seconds": 1.073440667008981,
+        "shard_file_opens": 8,
+        "bitwise_identical": true
+      }
+    ],
+    "logits_max_abs_diff": 0.0,
+    "logits_torch_equal": true,
+    "duplication_note": "every replicated tensor is written once per shard, and the tied embedding is stored under both wte.weight and lm_head.weight, so the four shards come to more than four times a quarter of the model. Deduplicating replicated tensors to rank 0 is not implemented."
+  },
+  "async_checkpoint": {
+    "state_bytes": 25165824,
+    "repeats": 3,
+    "statistic": "minimum over repeats",
+    "sync_blocking_s": 0.04229312500683591,
+    "async_blocking_s": 0.002323542023077607,
+    "async_background_s": 0.04258379200473428,
+    "step_time_ratio": 18.202005639139372,
+    "sync_blocking_s_all": [
+      0.04229312500683591,
+      0.051321125007234514,
+      0.04402441700221971
+    ],
+    "async_blocking_s_all": [
+      0.003096458036452532,
+      0.002323542023077607,
+      0.0030270839924924076
+    ],
+    "async_background_s_all": [
+      0.045732958998996764,
+      0.04258379200473428,
+      0.054028208018280566
+    ],
+    "ratio_all": [
+      13.658549384150279,
+      22.087452904879253,
+      14.543506923298603
+    ],
+    "note": "the blocking figure is what the training step pays. The async arm blocks for a host-memory copy of the state and nothing else; the write happens on a background thread. The ratio moves a lot between runs because the synchronous arm is at the mercy of the page cache."
+  },
+  "streaming": {
+    "repeats": 3,
+    "statistic": "best of repeats",
+    "block_size": 256,
+    "page_cached_samples_per_s": {
+      "0": 117054.62553766416,
+      "2": 25523.15777378593,
+      "8": 59968.51326792079
+    },
+    "slow_read_samples_per_s": {
+      "0": 707.5461251420587,
+      "2": 1354.137397585983,
+      "8": 1356.1294903536304
+    },
+    "slow_read_speedup_8_vs_0": 1.9166658429248713,
+    "ceiling_note": "the ceiling is 2.00x when a read and a step cost the same, because perfect overlap halves the total. Against a page-cached memmap the reader thread is pure overhead and prefetch is a loss."
+  },
+  "failure_restart": {
+    "world_size": 2,
+    "backend": "gloo",
+    "steps": 20,
+    "checkpoint_every": 5,
+    "killed_rank": 1,
+    "killed_at_step": 12,
+    "signal": "SIGKILL",
+    "resumed_from_step": 10,
+    "launches": 2,
+    "time_to_recover_s": 2.1980841159820557,
+    "resumed_steps": [
+      11,
+      20
+    ],
+    "max_abs_loss_difference": 0.0,
+    "events": [
+      "attempt 0: worker failure, exit codes [-9, -9]",
+      "resuming from step 10",
+      "attempt 1: clean exit [0, 0]"
+    ],
+    "recovery_note": "time to recover here is almost entirely process startup and importing torch. On a real job the same interval also contains the scheduler noticing, requeueing, allocating replacement nodes and re-reading a checkpoint of hundreds of gigabytes over the storage fabric."
+  },
+  "collectives": {
+    "world_size": 2,
+    "transport": "loopback TCP on this machine, not a fabric",
+    "points": [
+      {
+        "numel": 16384,
+        "bytes": 65536,
+        "median_s": 0.00044941698433831334,
+        "min_s": 0.0004114159964956343
+      },
+      {
+        "numel": 65536,
+        "bytes": 262144,
+        "median_s": 0.0005542500002775341,
+        "min_s": 0.0004723749589174986
+      },
+      {
+        "numel": 262144,
+        "bytes": 1048576,
+        "median_s": 0.0009402289579156786,
+        "min_s": 0.0008987499750219285
+      },
+      {
+        "numel": 1048576,
+        "bytes": 4194304,
+        "median_s": 0.0013766670017503202,
+        "min_s": 0.0011626659543253481
+      },
+      {
+        "numel": 4194304,
+        "bytes": 16777216,
+        "median_s": 0.00579666648991406,
+        "min_s": 0.0049896250129677355
+      }
+    ],
+    "fit": {
+      "latency_us": 408.287491473745,
+      "bandwidth_gbytes_per_s": 3.1583427089416567,
+      "r_squared": 0.9911415236435336,
+      "slope_s_per_byte": 3.166217513916007e-10,
+      "intercept_s": 0.00040828749147374496
+    },
+    "fit_range_bytes": [
+      16384,
+      4194304
+    ],
+    "note": "the fitted constants move with the machine's load; R^2 is the claim. Below about 64 KiB a gloo all-reduce is latency and scheduling noise and no affine model describes it, which is the model's own point."
+  },
+  "fabric_model": {
+    "status": "MODELLED from published peak bandwidths, not measured",
+    "links": {
+      "nvlink4": {
+        "gbytes_per_s": 450.0,
+        "source": "NVIDIA H100 datasheet: 18 NVLink 4 links x 25 GB/s per direction = 900 GB/s bidirectional aggregate per GPU; NVSwitch gives every GPU in the 8-GPU node that bandwidth all-to-all."
+      },
+      "nvlink3": {
+        "gbytes_per_s": 300.0,
+        "source": "NVIDIA A100 datasheet: 12 NVLink 3 links x 25 GB/s per direction = 600 GB/s bidirectional aggregate per GPU."
+      },
+      "pcie5": {
+        "gbytes_per_s": 63.0,
+        "source": "PCI-SIG: Gen5 is 32 GT/s per lane, 128b/130b encoded; x16 is ~63 GB/s per direction. This is the ceiling for a PCIe-attached GPU with no NVLink."
+      },
+      "ib_ndr": {
+        "gbytes_per_s": 50.0,
+        "source": "NVIDIA DGX H100: 8 x ConnectX-7 NDR400 compute NICs, 400 Gb/s = 50 GB/s each, one per GPU, so 50 GB/s per GPU and 400 GB/s per node."
+      },
+      "ib_hdr": {
+        "gbytes_per_s": 25.0,
+        "source": "NVIDIA DGX A100: 8 x HDR200 compute NICs, 200 Gb/s = 25 GB/s each."
+      },
+      "roce200": {
+        "gbytes_per_s": 25.0,
+        "source": "200 GbE line rate = 25 GB/s. RoCE v2 puts the same RDMA verbs on Ethernet; the wire rate matches HDR but it needs a lossless fabric (PFC/ECN) to get near it, and its small-message latency is higher."
+      }
+    },
+    "shape": {
+      "label": "70B-class, 8k context",
+      "params": 66525855744
+    },
+    "config": {
+      "tp": 8,
+      "dp": 8,
+      "world_size": 64
+    },
+    "modelled_compute_s_per_step": 8.533073683544698,
+    "modelled_comm_s_per_step": {
+      "nvlink4": {
+        "tp": 1.6436941736993465,
+        "fsdp": 0.11417949759999999,
+        "ddp": 0.07611966506666666,
+        "pp": 0.0,
+        "cp": 0.0
+      },
+      "pcie5": {
+        "tp": 11.407872669281044,
+        "fsdp": 0.8153728400000001,
+        "ddp": 0.5435818933333334,
+        "pp": 0.0,
+        "cp": 0.0
+      },
+      "ib_ndr": {
+        "tp": 14.219807563294118,
+        "fsdp": 1.0272794784000001,
+        "ddp": 0.6848529856000001,
+        "pp": 0.0,
+        "cp": 0.0
+      },
+      "roce200": {
+        "tp": 28.475455126588237,
+        "fsdp": 2.0545799568,
+        "ddp": 1.3697199712,
+        "pp": 0.0,
+        "cp": 0.0
+      }
+    },
+    "tp_over_fsdp_on_ib_ndr": 13.84219957887374,
+    "gpudirect_off_ib_ndr_tp_s": 22.887884101270586,
+    "gpudirect_penalty_ratio": 1.609577626096119,
+    "tp_crossover_degree": {
+      "nvlink4": 64,
+      "ib_ndr": 8,
+      "roce200": 4
+    }
+  },
+  "meta": {
+    "backend": "gloo",
+    "device": "cpu",
+    "torch": "2.2.2",
+    "python": "3.12.9",
+    "platform": "macOS-10.16-x86_64-i386-64bit",
+    "measured_vs_modelled": "resharding, async_checkpoint, streaming, failure_restart and collectives are MEASURED on this machine. fabric_model is MODELLED from the published bandwidths it carries with it.",
+    "runtime_seconds": 27.602792739868164
+  }
+}

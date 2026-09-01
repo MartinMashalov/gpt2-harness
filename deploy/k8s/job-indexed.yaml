@@ -1,0 +1,158 @@
+# A training job as a Kubernetes Job, one pod per node, one container per node,
+# one rank per GPU inside it.
+#
+# The two things that go wrong here and nowhere else:
+#
+#   1. /dev/shm. The default in a container is 64 MB. PyTorch DataLoader workers
+#      pass tensors between processes through shared memory, and NCCL uses it
+#      for intra-node transports. At 64 MB the job dies with "bus error" or
+#      "unable to write to shared memory", usually minutes in, usually blamed on
+#      the model. Size it explicitly (below) or the run is a coin flip.
+#   2. Placement. Kubernetes will spread pods across failure domains by default,
+#      which is right for a web service and wrong for a training job: ranks that
+#      should share a leaf switch end up three hops apart. The affinity and
+#      topology rules below say the opposite of what a service would say.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: gpt-train
+spec:
+  # Indexed completion gives every pod a stable JOB_COMPLETION_INDEX, which is
+  # the node rank. Without it there is no way to tell pod 0 from pod 5, and
+  # torchrun needs to know which one is the rendezvous host.
+  completionMode: Indexed
+  completions: 8
+  parallelism: 8
+  # One failed pod means the collective group is broken, so the whole job must
+  # go, not just that pod. backoffLimit counts the retries of the Job as a whole.
+  backoffLimit: 3
+  # Do not let a pod outlive the group it belongs to.
+  activeDeadlineSeconds: 86400
+  template:
+    metadata:
+      labels:
+        app: gpt-train
+    spec:
+      restartPolicy: Never
+      # A pod that cannot start every rank is worse than useless: it holds GPUs
+      # while the other seven pods wait at the rendezvous. Gang scheduling
+      # (Volcano, Kueue, or the Coscheduling plugin) is what stops that; the
+      # scheduler name below assumes Volcano is installed.
+      schedulerName: volcano
+      subdomain: gpt-train          # gives pods DNS names for the rendezvous
+      affinity:
+        podAffinity:
+          # Keep every pod of this job in one network topology zone, so the
+          # inter-node all-reduces stay on the same leaf/spine block instead of
+          # crossing the datacentre.
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: gpt-train
+              topologyKey: network.topology.nvidia.com/block
+        podAntiAffinity:
+          # ...but one pod per node, because each pod wants all 8 GPUs.
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: gpt-train
+              topologyKey: kubernetes.io/hostname
+      nodeSelector:
+        nvidia.com/gpu.product: NVIDIA-H100-80GB-HBM3
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      volumes:
+        # The fix for the 64 MB default. Memory-backed, so it comes out of the
+        # pod's memory limit -- which is why the limit below is larger than the
+        # process actually needs.
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 64Gi
+        - name: checkpoints
+          persistentVolumeClaim:
+            claimName: gpt-train-checkpoints   # RWX; a local disk loses the run
+        - name: data
+          persistentVolumeClaim:
+            claimName: training-corpus
+      containers:
+        - name: trainer
+          image: ghcr.io/example/transformer-internals:latest
+          command: ["torchrun"]
+          args:
+            - --nnodes=8
+            - --nproc-per-node=8
+            - --node-rank=$(JOB_COMPLETION_INDEX)
+            - --rdzv-backend=c10d
+            - --rdzv-endpoint=gpt-train-0.gpt-train:29500
+            - --rdzv-id=gpt-train
+            - --max-restarts=3
+            - -m
+            - transformer_internals.cluster.failure
+          env:
+            - name: JOB_COMPLETION_INDEX
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.annotations['batch.kubernetes.io/job-completion-index']
+            - name: NCCL_DEBUG
+              value: INFO
+            - name: NCCL_SOCKET_IFNAME
+              value: eth0
+            - name: NCCL_IB_HCA
+              value: mlx5
+            # Level 2: use GPUDirect RDMA when the GPU and NIC share a PCIe
+            # switch. See docs/CLUSTER.md for what it removes from the path.
+            - name: NCCL_NET_GDR_LEVEL
+              value: "2"
+            - name: TORCH_NCCL_ASYNC_ERROR_HANDLING
+              value: "1"
+            - name: OMP_NUM_THREADS
+              value: "6"
+          resources:
+            # requests == limits puts the pod in the Guaranteed QoS class. Any
+            # other setting makes it evictable under node memory pressure, and
+            # an evicted rank is a dead job. Extended resources like GPUs and
+            # RDMA devices cannot be overcommitted anyway, so only memory and
+            # CPU are a choice here, and the choice is to pin them.
+            requests:
+              cpu: "96"
+              memory: 900Gi
+              nvidia.com/gpu: "8"
+              rdma/hca_shared_devices_a: "1"
+            limits:
+              cpu: "96"
+              memory: 900Gi
+              nvidia.com/gpu: "8"
+              rdma/hca_shared_devices_a: "1"
+          securityContext:
+            capabilities:
+              add:
+                # RDMA needs to pin (mlock) the memory regions it registers with
+                # the NIC. Without IPC_LOCK the registration fails and NCCL
+                # silently falls back to TCP -- the job runs, at a fraction of
+                # the speed.
+                - IPC_LOCK
+          volumeMounts:
+            - name: dshm
+              mountPath: /dev/shm
+            - name: checkpoints
+              mountPath: /checkpoints
+            - name: data
+              mountPath: /data
+              readOnly: true
+---
+# Headless service so the rendezvous host has a DNS name that survives a
+# reschedule: gpt-train-0.gpt-train.<namespace>.svc.cluster.local
+apiVersion: v1
+kind: Service
+metadata:
+  name: gpt-train
+spec:
+  clusterIP: None
+  selector:
+    app: gpt-train
+  ports:
+    - name: rendezvous
+      port: 29500
