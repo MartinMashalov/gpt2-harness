@@ -11,61 +11,71 @@
           "op": "all_reduce",
           "numel": 4096,
           "bytes": 16384,
-          "median_s": 0.00037654151674360037,
-          "min_s": 0.00033354200422763824,
-          "algorithm_gbytes_per_s": 0.04351180220893519,
-          "bus_gbytes_per_s": 0.04351180220893519,
-          "bus_gbytes_per_s_best": 0.04912124947482814
+          "median_s": 0.0002917919773608446,
+          "min_s": 0.0002662499900907278,
+          "algorithm_gbytes_per_s": 0.05614959036292736,
+          "bus_gbytes_per_s": 0.05614959036292736,
+          "bus_gbytes_per_s_best": 0.06153615252498961
         },
         {
           "op": "all_reduce",
           "numel": 16384,
           "bytes": 65536,
-          "median_s": 0.000390208006137982,
-          "min_s": 0.0003742919652722776,
-          "algorithm_gbytes_per_s": 0.16795144889166042,
-          "bus_gbytes_per_s": 0.16795144889166042,
-          "bus_gbytes_per_s_best": 0.17509325895447964
+          "median_s": 0.00032056248164735734,
+          "min_s": 0.0003034170367754996,
+          "algorithm_gbytes_per_s": 0.20444064340659332,
+          "bus_gbytes_per_s": 0.20444064340659332,
+          "bus_gbytes_per_s_best": 0.21599314493500427
         },
         {
           "op": "all_reduce",
           "numel": 65536,
           "bytes": 262144,
-          "median_s": 0.000499708519782871,
-          "min_s": 0.00045445800060406327,
-          "algorithm_gbytes_per_s": 0.5245938174396236,
-          "bus_gbytes_per_s": 0.5245938174396236,
-          "bus_gbytes_per_s_best": 0.5768277808984758
+          "median_s": 0.00044097902718931437,
+          "min_s": 0.0003195420140400529,
+          "algorithm_gbytes_per_s": 0.5944591099282832,
+          "bus_gbytes_per_s": 0.5944591099282832,
+          "bus_gbytes_per_s_best": 0.8203741244715997
         },
         {
           "op": "all_reduce",
           "numel": 262144,
           "bytes": 1048576,
-          "median_s": 0.0010425204818602651,
-          "min_s": 0.0010092500015161932,
-          "algorithm_gbytes_per_s": 1.0058085363742009,
-          "bus_gbytes_per_s": 1.0058085363742009,
-          "bus_gbytes_per_s_best": 1.0389655669306193
+          "median_s": 0.0005459994717966765,
+          "min_s": 0.0003701249952428043,
+          "algorithm_gbytes_per_s": 1.9204707223425241,
+          "bus_gbytes_per_s": 1.9204707223425241,
+          "bus_gbytes_per_s_best": 2.8330321201682898
         },
         {
           "op": "all_reduce",
           "numel": 1048576,
           "bytes": 4194304,
-          "median_s": 0.0018671244906727225,
-          "min_s": 0.00148583302507177,
-          "algorithm_gbytes_per_s": 2.246397613524312,
-          "bus_gbytes_per_s": 2.246397613524312,
-          "bus_gbytes_per_s_best": 2.822863625471915
+          "median_s": 0.0013746460026595742,
+          "min_s": 0.0010366670321673155,
+          "algorithm_gbytes_per_s": 3.0511884455235294,
+          "bus_gbytes_per_s": 3.0511884455235294,
+          "bus_gbytes_per_s_best": 4.0459509850825945
         },
         {
           "op": "all_reduce",
           "numel": 4194304,
           "bytes": 16777216,
-          "median_s": 0.006241833005333319,
-          "min_s": 0.00608870800351724,
-          "algorithm_gbytes_per_s": 2.6878668470727667,
-          "bus_gbytes_per_s": 2.6878668470727667,
-          "bus_gbytes_per_s_best": 2.755464047595708
+          "median_s": 0.005410729005234316,
+          "min_s": 0.004560499975923449,
+          "algorithm_gbytes_per_s": 3.100731155408041,
+          "bus_gbytes_per_s": 3.100731155408041,
+          "bus_gbytes_per_s_best": 3.678810676148026
+        },
+        {
+          "op": "all_reduce",
+          "numel": 16777216,
+          "bytes": 67108864,
+          "median_s": 0.023233374988194555,
+          "min_s": 0.021685708954464644,
+          "algorithm_gbytes_per_s": 2.8884681641862042,
+          "bus_gbytes_per_s": 2.8884681641862042,
+          "bus_gbytes_per_s_best": 3.0946124076881363
         }
       ],
       "by_op": {
@@ -75,71 +85,81 @@
               "op": "all_reduce",
               "numel": 4096,
               "bytes": 16384,
-              "median_s": 0.00037654151674360037,
-              "min_s": 0.00033354200422763824,
-              "algorithm_gbytes_per_s": 0.04351180220893519,
-              "bus_gbytes_per_s": 0.04351180220893519,
-              "bus_gbytes_per_s_best": 0.04912124947482814
+              "median_s": 0.0002917919773608446,
+              "min_s": 0.0002662499900907278,
+              "algorithm_gbytes_per_s": 0.05614959036292736,
+              "bus_gbytes_per_s": 0.05614959036292736,
+              "bus_gbytes_per_s_best": 0.06153615252498961
             },
             {
               "op": "all_reduce",
               "numel": 16384,
               "bytes": 65536,
-              "median_s": 0.000390208006137982,
-              "min_s": 0.0003742919652722776,
-              "algorithm_gbytes_per_s": 0.16795144889166042,
-              "bus_gbytes_per_s": 0.16795144889166042,
-              "bus_gbytes_per_s_best": 0.17509325895447964
+              "median_s": 0.00032056248164735734,
+              "min_s": 0.0003034170367754996,
+              "algorithm_gbytes_per_s": 0.20444064340659332,
+              "bus_gbytes_per_s": 0.20444064340659332,
+              "bus_gbytes_per_s_best": 0.21599314493500427
             },
             {
               "op": "all_reduce",
               "numel": 65536,
               "bytes": 262144,
-              "median_s": 0.000499708519782871,
-              "min_s": 0.00045445800060406327,
-              "algorithm_gbytes_per_s": 0.5245938174396236,
-              "bus_gbytes_per_s": 0.5245938174396236,
-              "bus_gbytes_per_s_best": 0.5768277808984758
+              "median_s": 0.00044097902718931437,
+              "min_s": 0.0003195420140400529,
+              "algorithm_gbytes_per_s": 0.5944591099282832,
+              "bus_gbytes_per_s": 0.5944591099282832,
+              "bus_gbytes_per_s_best": 0.8203741244715997
             },
             {
               "op": "all_reduce",
               "numel": 262144,
               "bytes": 1048576,
-              "median_s": 0.0010425204818602651,
-              "min_s": 0.0010092500015161932,
-              "algorithm_gbytes_per_s": 1.0058085363742009,
-              "bus_gbytes_per_s": 1.0058085363742009,
-              "bus_gbytes_per_s_best": 1.0389655669306193
+              "median_s": 0.0005459994717966765,
+              "min_s": 0.0003701249952428043,
+              "algorithm_gbytes_per_s": 1.9204707223425241,
+              "bus_gbytes_per_s": 1.9204707223425241,
+              "bus_gbytes_per_s_best": 2.8330321201682898
             },
             {
               "op": "all_reduce",
               "numel": 1048576,
               "bytes": 4194304,
-              "median_s": 0.0018671244906727225,
-              "min_s": 0.00148583302507177,
-              "algorithm_gbytes_per_s": 2.246397613524312,
-              "bus_gbytes_per_s": 2.246397613524312,
-              "bus_gbytes_per_s_best": 2.822863625471915
+              "median_s": 0.0013746460026595742,
+              "min_s": 0.0010366670321673155,
+              "algorithm_gbytes_per_s": 3.0511884455235294,
+              "bus_gbytes_per_s": 3.0511884455235294,
+              "bus_gbytes_per_s_best": 4.0459509850825945
             },
             {
               "op": "all_reduce",
               "numel": 4194304,
               "bytes": 16777216,
-              "median_s": 0.006241833005333319,
-              "min_s": 0.00608870800351724,
-              "algorithm_gbytes_per_s": 2.6878668470727667,
-              "bus_gbytes_per_s": 2.6878668470727667,
-              "bus_gbytes_per_s_best": 2.755464047595708
+              "median_s": 0.005410729005234316,
+              "min_s": 0.004560499975923449,
+              "algorithm_gbytes_per_s": 3.100731155408041,
+              "bus_gbytes_per_s": 3.100731155408041,
+              "bus_gbytes_per_s_best": 3.678810676148026
+            },
+            {
+              "op": "all_reduce",
+              "numel": 16777216,
+              "bytes": 67108864,
+              "median_s": 0.023233374988194555,
+              "min_s": 0.021685708954464644,
+              "algorithm_gbytes_per_s": 2.8884681641862042,
+              "bus_gbytes_per_s": 2.8884681641862042,
+              "bus_gbytes_per_s_best": 3.0946124076881363
             }
           ],
-          "peak_bus_gbytes_per_s": 2.6878668470727667,
+          "peak_bus_gbytes_per_s": 3.100731155408041,
           "fit": {
             "op": "all_reduce",
-            "latency_us": 447.7619776574,
-            "bandwidth_gbytes_per_s": 2.8926538128117074,
-            "r_squared": 0.9973542459770901,
-            "slope_s_per_byte": 3.457033107698371e-10,
-            "intercept_s": 0.0004477619776574
+            "latency_us": 143.75124947414807,
+            "bandwidth_gbytes_per_s": 2.922825617733305,
+            "r_squared": 0.9991341373497075,
+            "slope_s_per_byte": 3.421346774617074e-10,
+            "intercept_s": 0.00014375124947414806
           }
         },
         "all_gather": {
@@ -148,71 +168,81 @@
               "op": "all_gather",
               "numel": 4096,
               "bytes": 16384,
-              "median_s": 0.0003340205003041774,
-              "min_s": 0.00021808297606185079,
-              "algorithm_gbytes_per_s": 0.04905088156289758,
-              "bus_gbytes_per_s": 0.02452544078144879,
-              "bus_gbytes_per_s_best": 0.03756368400657122
+              "median_s": 0.00013158298679627478,
+              "min_s": 0.00010466697858646512,
+              "algorithm_gbytes_per_s": 0.1245145774458423,
+              "bus_gbytes_per_s": 0.06225728872292115,
+              "bus_gbytes_per_s_best": 0.07826728267724485
             },
             {
               "op": "all_gather",
               "numel": 16384,
               "bytes": 65536,
-              "median_s": 0.0002295629819855094,
-              "min_s": 0.00016066600801423192,
-              "algorithm_gbytes_per_s": 0.28548156777357425,
-              "bus_gbytes_per_s": 0.14274078388678713,
-              "bus_gbytes_per_s_best": 0.20395104356546523
+              "median_s": 0.0001230209891218692,
+              "min_s": 0.00010975002078339458,
+              "algorithm_gbytes_per_s": 0.532722102689953,
+              "bus_gbytes_per_s": 0.2663610513449765,
+              "bus_gbytes_per_s_best": 0.2985694195418127
             },
             {
               "op": "all_gather",
               "numel": 65536,
               "bytes": 262144,
-              "median_s": 0.0002452500048093498,
-              "min_s": 0.00019829097436740994,
-              "algorithm_gbytes_per_s": 1.0688847904561025,
-              "bus_gbytes_per_s": 0.5344423952280513,
-              "bus_gbytes_per_s_best": 0.6610084015076699
+              "median_s": 0.00019375048577785492,
+              "min_s": 0.00012420903658494353,
+              "algorithm_gbytes_per_s": 1.3529978980313981,
+              "bus_gbytes_per_s": 0.6764989490156991,
+              "bus_gbytes_per_s_best": 1.0552533342480526
             },
             {
               "op": "all_gather",
               "numel": 262144,
               "bytes": 1048576,
-              "median_s": 0.0005439375236164778,
-              "min_s": 0.00047745800111442804,
-              "algorithm_gbytes_per_s": 1.9277508067991558,
-              "bus_gbytes_per_s": 0.9638754033995779,
-              "bus_gbytes_per_s_best": 1.0980819229676049
+              "median_s": 0.0003532499831635505,
+              "min_s": 0.0002841249806806445,
+              "algorithm_gbytes_per_s": 2.968368152800511,
+              "bus_gbytes_per_s": 1.4841840764002554,
+              "bus_gbytes_per_s_best": 1.8452724527918152
             },
             {
               "op": "all_gather",
               "numel": 1048576,
               "bytes": 4194304,
-              "median_s": 0.0017816870240494609,
-              "min_s": 0.0013547079870477319,
-              "algorithm_gbytes_per_s": 2.3541194067109976,
-              "bus_gbytes_per_s": 1.1770597033554988,
-              "bus_gbytes_per_s_best": 1.548047269264464
+              "median_s": 0.0011919165262952447,
+              "min_s": 0.001048165955580771,
+              "algorithm_gbytes_per_s": 3.518957835945842,
+              "bus_gbytes_per_s": 1.759478917972921,
+              "bus_gbytes_per_s_best": 2.00078240362043
             },
             {
               "op": "all_gather",
               "numel": 4194304,
               "bytes": 16777216,
-              "median_s": 0.00439372900291346,
-              "min_s": 0.003913833003025502,
-              "algorithm_gbytes_per_s": 3.8184457869101873,
-              "bus_gbytes_per_s": 1.9092228934550937,
-              "bus_gbytes_per_s_best": 2.143322924998428
+              "median_s": 0.00429495851858519,
+              "min_s": 0.003523999999742955,
+              "algorithm_gbytes_per_s": 3.906257983028579,
+              "bus_gbytes_per_s": 1.9531289915142895,
+              "bus_gbytes_per_s_best": 2.380422247619715
+            },
+            {
+              "op": "all_gather",
+              "numel": 16777216,
+              "bytes": 67108864,
+              "median_s": 0.016318228997988626,
+              "min_s": 0.013565291999839246,
+              "algorithm_gbytes_per_s": 4.11250902339168,
+              "bus_gbytes_per_s": 2.05625451169584,
+              "bus_gbytes_per_s_best": 2.473550292938599
             }
           ],
-          "peak_bus_gbytes_per_s": 1.9092228934550937,
+          "peak_bus_gbytes_per_s": 2.05625451169584,
           "fit": {
             "op": "all_gather",
-            "latency_us": 330.38176705440526,
-            "bandwidth_gbytes_per_s": 2.0162799883388485,
-            "r_squared": 0.9839961414868672,
-            "slope_s_per_byte": 2.479814325846356e-10,
-            "intercept_s": 0.00033038176705440527
+            "latency_us": 143.79322068453112,
+            "bandwidth_gbytes_per_s": 2.0711198621984273,
+            "r_squared": 0.999925749456164,
+            "slope_s_per_byte": 2.414152889583445e-10,
+            "intercept_s": 0.0001437932206845311
           }
         },
         "reduce_scatter": {
@@ -221,71 +251,81 @@
               "op": "reduce_scatter",
               "numel": 4096,
               "bytes": 16384,
-              "median_s": 0.00033008347963914275,
-              "min_s": 0.00027895800303667784,
-              "algorithm_gbytes_per_s": 0.04963592851696633,
-              "bus_gbytes_per_s": 0.024817964258483163,
-              "bus_gbytes_per_s_best": 0.02936642760137232
+              "median_s": 0.0003394999948795885,
+              "min_s": 0.0002614170080050826,
+              "algorithm_gbytes_per_s": 0.048259205440668605,
+              "bus_gbytes_per_s": 0.024129602720334303,
+              "bus_gbytes_per_s_best": 0.03133690520947561
             },
             {
               "op": "reduce_scatter",
               "numel": 16384,
               "bytes": 65536,
-              "median_s": 0.0003669789875857532,
-              "min_s": 0.0002870000316761434,
-              "algorithm_gbytes_per_s": 0.17858243173850924,
-              "bus_gbytes_per_s": 0.08929121586925462,
-              "bus_gbytes_per_s_best": 0.11417420342648626
+              "median_s": 0.0003271455061621964,
+              "min_s": 0.0002654999843798578,
+              "algorithm_gbytes_per_s": 0.20032676214573378,
+              "bus_gbytes_per_s": 0.10016338107286689,
+              "bus_gbytes_per_s_best": 0.12341996959637468
             },
             {
               "op": "reduce_scatter",
               "numel": 65536,
               "bytes": 262144,
-              "median_s": 0.0004246665339451283,
-              "min_s": 0.0003845419851131737,
-              "algorithm_gbytes_per_s": 0.6172937565027715,
-              "bus_gbytes_per_s": 0.30864687825138576,
-              "bus_gbytes_per_s_best": 0.3408522478018219
+              "median_s": 0.00039306250982917845,
+              "min_s": 0.0002880420070141554,
+              "algorithm_gbytes_per_s": 0.6669269987461421,
+              "bus_gbytes_per_s": 0.33346349937307107,
+              "bus_gbytes_per_s_best": 0.4550447393374768
             },
             {
               "op": "reduce_scatter",
               "numel": 262144,
               "bytes": 1048576,
-              "median_s": 0.0008093960059341043,
-              "min_s": 0.0007083750097081065,
-              "algorithm_gbytes_per_s": 1.2955042924753055,
-              "bus_gbytes_per_s": 0.6477521462376528,
-              "bus_gbytes_per_s_best": 0.7401277470474833
+              "median_s": 0.0005643749900627881,
+              "min_s": 0.0004254590021446347,
+              "algorithm_gbytes_per_s": 1.8579420039207324,
+              "bus_gbytes_per_s": 0.9289710019603662,
+              "bus_gbytes_per_s_best": 1.2322879463290057
             },
             {
               "op": "reduce_scatter",
               "numel": 1048576,
               "bytes": 4194304,
-              "median_s": 0.002043229527771473,
-              "min_s": 0.0017648329958319664,
-              "algorithm_gbytes_per_s": 2.05278161018683,
-              "bus_gbytes_per_s": 1.026390805093415,
-              "bus_gbytes_per_s_best": 1.1883005388911452
+              "median_s": 0.001695291488431394,
+              "min_s": 0.0014879999798722565,
+              "algorithm_gbytes_per_s": 2.4740901659813512,
+              "bus_gbytes_per_s": 1.2370450829906756,
+              "bus_gbytes_per_s_best": 1.4093763631502458
             },
             {
               "op": "reduce_scatter",
               "numel": 4194304,
               "bytes": 16777216,
-              "median_s": 0.007534541509812698,
-              "min_s": 0.007208583003375679,
-              "algorithm_gbytes_per_s": 2.226706957304568,
-              "bus_gbytes_per_s": 1.113353478652284,
-              "bus_gbytes_per_s_best": 1.1636972198380362
+              "median_s": 0.006812146486481652,
+              "min_s": 0.006063250009901822,
+              "algorithm_gbytes_per_s": 2.4628384068506906,
+              "bus_gbytes_per_s": 1.2314192034253453,
+              "bus_gbytes_per_s_best": 1.3835167585536905
+            },
+            {
+              "op": "reduce_scatter",
+              "numel": 16777216,
+              "bytes": 67108864,
+              "median_s": 0.02836720849154517,
+              "min_s": 0.026795208046678454,
+              "algorithm_gbytes_per_s": 2.3657197013235107,
+              "bus_gbytes_per_s": 1.1828598506617554,
+              "bus_gbytes_per_s_best": 1.2522549532568163
             }
           ],
-          "peak_bus_gbytes_per_s": 1.113353478652284,
+          "peak_bus_gbytes_per_s": 1.2370450829906756,
           "fit": {
             "op": "reduce_scatter",
-            "latency_us": 318.6231191944038,
-            "bandwidth_gbytes_per_s": 1.1651450128469534,
-            "r_squared": 0.9997979728976996,
-            "slope_s_per_byte": 4.291311334528941e-10,
-            "intercept_s": 0.0003186231191944038
+            "latency_us": 143.87005255395417,
+            "bandwidth_gbytes_per_s": 1.1932396948891884,
+            "r_squared": 0.999589889377687,
+            "slope_s_per_byte": 4.1902729362890755e-10,
+            "intercept_s": 0.00014387005255395418
           }
         }
       },
@@ -296,11 +336,11 @@
       ],
       "fit": {
         "op": "all_reduce",
-        "latency_us": 447.7619776574,
-        "bandwidth_gbytes_per_s": 2.8926538128117074,
-        "r_squared": 0.9973542459770901,
-        "slope_s_per_byte": 3.457033107698371e-10,
-        "intercept_s": 0.0004477619776574
+        "latency_us": 143.75124947414807,
+        "bandwidth_gbytes_per_s": 2.922825617733305,
+        "r_squared": 0.9991341373497075,
+        "slope_s_per_byte": 3.421346774617074e-10,
+        "intercept_s": 0.00014375124947414806
       },
       "measurement_note": "MEASURED on this machine over gloo, device cpu. Bus bandwidth follows NCCL's convention: algorithm bandwidth times the ring factor for the collective, so the three collectives are comparable with each other and across world sizes."
     },
@@ -313,61 +353,71 @@
           "op": "all_reduce",
           "numel": 4096,
           "bytes": 16384,
-          "median_s": 0.0009887295018415898,
-          "min_s": 0.0008917090017348528,
-          "algorithm_gbytes_per_s": 0.01657076072827144,
-          "bus_gbytes_per_s": 0.02485614109240716,
-          "bus_gbytes_per_s_best": 0.02756056062256463
+          "median_s": 0.001665020507061854,
+          "min_s": 0.0011406660196371377,
+          "algorithm_gbytes_per_s": 0.009840119043885955,
+          "bus_gbytes_per_s": 0.014760178565828935,
+          "bus_gbytes_per_s_best": 0.021545307370353664
         },
         {
           "op": "all_reduce",
           "numel": 16384,
           "bytes": 65536,
-          "median_s": 0.0009758960222825408,
-          "min_s": 0.000851707998663187,
-          "algorithm_gbytes_per_s": 0.06715469527861859,
-          "bus_gbytes_per_s": 0.1007320429179279,
-          "bus_gbytes_per_s_best": 0.11541983890522894
+          "median_s": 0.0012754164636135101,
+          "min_s": 0.0008829159778542817,
+          "algorithm_gbytes_per_s": 0.05138400034003277,
+          "bus_gbytes_per_s": 0.07707600051004916,
+          "bus_gbytes_per_s_best": 0.11134015293154464
         },
         {
           "op": "all_reduce",
           "numel": 65536,
           "bytes": 262144,
-          "median_s": 0.0010943539964500815,
-          "min_s": 0.0010249590268358588,
-          "algorithm_gbytes_per_s": 0.23954223299805677,
-          "bus_gbytes_per_s": 0.35931334949708515,
-          "bus_gbytes_per_s_best": 0.38364070143749385
+          "median_s": 0.001266958483029157,
+          "min_s": 0.0009428749908693135,
+          "algorithm_gbytes_per_s": 0.20690812170359588,
+          "bus_gbytes_per_s": 0.31036218255539383,
+          "bus_gbytes_per_s_best": 0.41703937829283405
         },
         {
           "op": "all_reduce",
           "numel": 262144,
           "bytes": 1048576,
-          "median_s": 0.0017011459858622402,
-          "min_s": 0.0015939159784466028,
-          "algorithm_gbytes_per_s": 0.6163938948887566,
-          "bus_gbytes_per_s": 0.9245908423331349,
-          "bus_gbytes_per_s_best": 0.986792290979403
+          "median_s": 0.002367083536228165,
+          "min_s": 0.0013764169998466969,
+          "algorithm_gbytes_per_s": 0.44298225387974943,
+          "bus_gbytes_per_s": 0.6644733808196241,
+          "bus_gbytes_per_s_best": 1.1427234625663467
         },
         {
           "op": "all_reduce",
           "numel": 1048576,
           "bytes": 4194304,
-          "median_s": 0.0037856874987483025,
-          "min_s": 0.003660332993604243,
-          "algorithm_gbytes_per_s": 1.107937198035179,
-          "bus_gbytes_per_s": 1.6619057970527686,
-          "bus_gbytes_per_s_best": 1.7188206676805524
+          "median_s": 0.004551688034553081,
+          "min_s": 0.0034090420231223106,
+          "algorithm_gbytes_per_s": 0.9214831878107456,
+          "bus_gbytes_per_s": 1.3822247817161184,
+          "bus_gbytes_per_s_best": 1.8455202245461655
         },
         {
           "op": "all_reduce",
           "numel": 4194304,
           "bytes": 16777216,
-          "median_s": 0.013062083016848192,
-          "min_s": 0.012193124974146485,
-          "algorithm_gbytes_per_s": 1.2844211737408058,
-          "bus_gbytes_per_s": 1.9266317606112089,
-          "bus_gbytes_per_s_best": 2.0639355418204923
+          "median_s": 0.014636250503826886,
+          "min_s": 0.012516415969002992,
+          "algorithm_gbytes_per_s": 1.1462782763668415,
+          "bus_gbytes_per_s": 1.7194174145502625,
+          "bus_gbytes_per_s_best": 2.0106254108463135
+        },
+        {
+          "op": "all_reduce",
+          "numel": 16777216,
+          "bytes": 67108864,
+          "median_s": 0.053249541990226135,
+          "min_s": 0.050805334001779556,
+          "algorithm_gbytes_per_s": 1.2602711965544742,
+          "bus_gbytes_per_s": 1.8904067948317114,
+          "bus_gbytes_per_s_best": 1.981352902757692
         }
       ],
       "by_op": {
@@ -377,71 +427,81 @@
               "op": "all_reduce",
               "numel": 4096,
               "bytes": 16384,
-              "median_s": 0.0009887295018415898,
-              "min_s": 0.0008917090017348528,
-              "algorithm_gbytes_per_s": 0.01657076072827144,
-              "bus_gbytes_per_s": 0.02485614109240716,
-              "bus_gbytes_per_s_best": 0.02756056062256463
+              "median_s": 0.001665020507061854,
+              "min_s": 0.0011406660196371377,
+              "algorithm_gbytes_per_s": 0.009840119043885955,
+              "bus_gbytes_per_s": 0.014760178565828935,
+              "bus_gbytes_per_s_best": 0.021545307370353664
             },
             {
               "op": "all_reduce",
               "numel": 16384,
               "bytes": 65536,
-              "median_s": 0.0009758960222825408,
-              "min_s": 0.000851707998663187,
-              "algorithm_gbytes_per_s": 0.06715469527861859,
-              "bus_gbytes_per_s": 0.1007320429179279,
-              "bus_gbytes_per_s_best": 0.11541983890522894
+              "median_s": 0.0012754164636135101,
+              "min_s": 0.0008829159778542817,
+              "algorithm_gbytes_per_s": 0.05138400034003277,
+              "bus_gbytes_per_s": 0.07707600051004916,
+              "bus_gbytes_per_s_best": 0.11134015293154464
             },
             {
               "op": "all_reduce",
               "numel": 65536,
               "bytes": 262144,
-              "median_s": 0.0010943539964500815,
-              "min_s": 0.0010249590268358588,
-              "algorithm_gbytes_per_s": 0.23954223299805677,
-              "bus_gbytes_per_s": 0.35931334949708515,
-              "bus_gbytes_per_s_best": 0.38364070143749385
+              "median_s": 0.001266958483029157,
+              "min_s": 0.0009428749908693135,
+              "algorithm_gbytes_per_s": 0.20690812170359588,
+              "bus_gbytes_per_s": 0.31036218255539383,
+              "bus_gbytes_per_s_best": 0.41703937829283405
             },
             {
               "op": "all_reduce",
               "numel": 262144,
               "bytes": 1048576,
-              "median_s": 0.0017011459858622402,
-              "min_s": 0.0015939159784466028,
-              "algorithm_gbytes_per_s": 0.6163938948887566,
-              "bus_gbytes_per_s": 0.9245908423331349,
-              "bus_gbytes_per_s_best": 0.986792290979403
+              "median_s": 0.002367083536228165,
+              "min_s": 0.0013764169998466969,
+              "algorithm_gbytes_per_s": 0.44298225387974943,
+              "bus_gbytes_per_s": 0.6644733808196241,
+              "bus_gbytes_per_s_best": 1.1427234625663467
             },
             {
               "op": "all_reduce",
               "numel": 1048576,
               "bytes": 4194304,
-              "median_s": 0.0037856874987483025,
-              "min_s": 0.003660332993604243,
-              "algorithm_gbytes_per_s": 1.107937198035179,
-              "bus_gbytes_per_s": 1.6619057970527686,
-              "bus_gbytes_per_s_best": 1.7188206676805524
+              "median_s": 0.004551688034553081,
+              "min_s": 0.0034090420231223106,
+              "algorithm_gbytes_per_s": 0.9214831878107456,
+              "bus_gbytes_per_s": 1.3822247817161184,
+              "bus_gbytes_per_s_best": 1.8455202245461655
             },
             {
               "op": "all_reduce",
               "numel": 4194304,
               "bytes": 16777216,
-              "median_s": 0.013062083016848192,
-              "min_s": 0.012193124974146485,
-              "algorithm_gbytes_per_s": 1.2844211737408058,
-              "bus_gbytes_per_s": 1.9266317606112089,
-              "bus_gbytes_per_s_best": 2.0639355418204923
+              "median_s": 0.014636250503826886,
+              "min_s": 0.012516415969002992,
+              "algorithm_gbytes_per_s": 1.1462782763668415,
+              "bus_gbytes_per_s": 1.7194174145502625,
+              "bus_gbytes_per_s_best": 2.0106254108463135
+            },
+            {
+              "op": "all_reduce",
+              "numel": 16777216,
+              "bytes": 67108864,
+              "median_s": 0.053249541990226135,
+              "min_s": 0.050805334001779556,
+              "algorithm_gbytes_per_s": 1.2602711965544742,
+              "bus_gbytes_per_s": 1.8904067948317114,
+              "bus_gbytes_per_s_best": 1.981352902757692
             }
           ],
-          "peak_bus_gbytes_per_s": 1.9266317606112089,
+          "peak_bus_gbytes_per_s": 1.8904067948317114,
           "fit": {
             "op": "all_reduce",
-            "latency_us": 909.366917523323,
-            "bandwidth_gbytes_per_s": 2.0769486424420722,
-            "r_squared": 0.9997278177015161,
-            "slope_s_per_byte": 7.222133322643466e-10,
-            "intercept_s": 0.0009093669175233229
+            "latency_us": 1400.6627376766494,
+            "bandwidth_gbytes_per_s": 1.9392390185308956,
+            "r_squared": 0.9998581415513291,
+            "slope_s_per_byte": 7.734992879507711e-10,
+            "intercept_s": 0.0014006627376766494
           }
         },
         "all_gather": {
@@ -450,71 +510,81 @@
               "op": "all_gather",
               "numel": 4096,
               "bytes": 16384,
-              "median_s": 0.0005378750211093575,
-              "min_s": 0.00045666698133572936,
-              "algorithm_gbytes_per_s": 0.0304606076820751,
-              "bus_gbytes_per_s": 0.022845455761556322,
-              "bus_gbytes_per_s_best": 0.026908010655944906
+              "median_s": 0.0005747704999521375,
+              "min_s": 0.000486500037368387,
+              "algorithm_gbytes_per_s": 0.028505290374791912,
+              "bus_gbytes_per_s": 0.02137896778109393,
+              "bus_gbytes_per_s_best": 0.025257963116445344
             },
             {
               "op": "all_gather",
               "numel": 16384,
               "bytes": 65536,
-              "median_s": 0.000545457995031029,
-              "min_s": 0.00046029099030420184,
-              "algorithm_gbytes_per_s": 0.120148573486895,
-              "bus_gbytes_per_s": 0.09011143011517125,
-              "bus_gbytes_per_s_best": 0.10678462328258027
+              "median_s": 0.0006045204936526716,
+              "min_s": 0.0005123750306665897,
+              "algorithm_gbytes_per_s": 0.10840988963668424,
+              "bus_gbytes_per_s": 0.08130741722751318,
+              "bus_gbytes_per_s_best": 0.09592973321915048
             },
             {
               "op": "all_gather",
               "numel": 65536,
               "bytes": 262144,
-              "median_s": 0.0005794165190309286,
-              "min_s": 0.0005132919759489596,
-              "algorithm_gbytes_per_s": 0.45242755667103624,
-              "bus_gbytes_per_s": 0.33932066750327716,
-              "bus_gbytes_per_s_best": 0.38303345700371944
+              "median_s": 0.0006618539919145405,
+              "min_s": 0.0005973749794065952,
+              "algorithm_gbytes_per_s": 0.39607527219364175,
+              "bus_gbytes_per_s": 0.2970564541452313,
+              "bus_gbytes_per_s_best": 0.3291199109063814
             },
             {
               "op": "all_gather",
               "numel": 262144,
               "bytes": 1048576,
-              "median_s": 0.0010246460151392967,
-              "min_s": 0.0009681250085122883,
-              "algorithm_gbytes_per_s": 1.023354392158008,
-              "bus_gbytes_per_s": 0.7675157941185059,
-              "bus_gbytes_per_s_best": 0.8123248476025892
+              "median_s": 0.001045312499627471,
+              "min_s": 0.0008774579619057477,
+              "algorithm_gbytes_per_s": 1.003122033242396,
+              "bus_gbytes_per_s": 0.7523415249317971,
+              "bus_gbytes_per_s_best": 0.8962617403253729
             },
             {
               "op": "all_gather",
               "numel": 1048576,
               "bytes": 4194304,
-              "median_s": 0.0031142499938141555,
-              "min_s": 0.0026269580121152103,
-              "algorithm_gbytes_per_s": 1.3468103101328277,
-              "bus_gbytes_per_s": 1.0101077325996208,
-              "bus_gbytes_per_s_best": 1.1974793603446594
+              "median_s": 0.002728687511989847,
+              "min_s": 0.002075334021355957,
+              "algorithm_gbytes_per_s": 1.5371140819790605,
+              "bus_gbytes_per_s": 1.1528355614842953,
+              "bus_gbytes_per_s_best": 1.5157694942738336
             },
             {
               "op": "all_gather",
               "numel": 4194304,
               "bytes": 16777216,
-              "median_s": 0.0083843955071643,
-              "min_s": 0.007640915981028229,
-              "algorithm_gbytes_per_s": 2.001004841155716,
-              "bus_gbytes_per_s": 1.5007536308667873,
-              "bus_gbytes_per_s_best": 1.646780573329473
+              "median_s": 0.007892021007137373,
+              "min_s": 0.006905459042172879,
+              "algorithm_gbytes_per_s": 2.125845329710482,
+              "bus_gbytes_per_s": 1.5943839972828617,
+              "bus_gbytes_per_s_best": 1.8221687976358842
+            },
+            {
+              "op": "all_gather",
+              "numel": 16777216,
+              "bytes": 67108864,
+              "median_s": 0.029927208495792,
+              "min_s": 0.025737666990607977,
+              "algorithm_gbytes_per_s": 2.2424030630667082,
+              "bus_gbytes_per_s": 1.6818022973000313,
+              "bus_gbytes_per_s_best": 1.955563727604631
             }
           ],
-          "peak_bus_gbytes_per_s": 1.5007536308667873,
+          "peak_bus_gbytes_per_s": 1.6818022973000313,
           "fit": {
             "op": "all_gather",
-            "latency_us": 609.2260301286676,
-            "bandwidth_gbytes_per_s": 1.5927852942366543,
-            "r_squared": 0.9929517896570328,
-            "slope_s_per_byte": 4.708732575029449e-10,
-            "intercept_s": 0.0006092260301286676
+            "latency_us": 623.1916241705559,
+            "bandwidth_gbytes_per_s": 1.7174629171518137,
+            "r_squared": 0.9998700901039757,
+            "slope_s_per_byte": 4.3669065137300103e-10,
+            "intercept_s": 0.0006231916241705559
           }
         },
         "reduce_scatter": {
@@ -523,71 +593,81 @@
               "op": "reduce_scatter",
               "numel": 4096,
               "bytes": 16384,
-              "median_s": 0.001169958501122892,
-              "min_s": 0.0010919999913312495,
-              "algorithm_gbytes_per_s": 0.01400391551005879,
-              "bus_gbytes_per_s": 0.010502936632544093,
-              "bus_gbytes_per_s_best": 0.011252747342076245
+              "median_s": 0.00132664549164474,
+              "min_s": 0.001069249992724508,
+              "algorithm_gbytes_per_s": 0.012349945862091273,
+              "bus_gbytes_per_s": 0.009262459396568454,
+              "bus_gbytes_per_s_best": 0.011492167485257117
             },
             {
               "op": "reduce_scatter",
               "numel": 16384,
               "bytes": 65536,
-              "median_s": 0.00124368752585724,
-              "min_s": 0.0010290000354871154,
-              "algorithm_gbytes_per_s": 0.05269490819635569,
-              "bus_gbytes_per_s": 0.039521181147266764,
-              "bus_gbytes_per_s_best": 0.04776676220106453
+              "median_s": 0.001216812466736883,
+              "min_s": 0.0009958339505828917,
+              "algorithm_gbytes_per_s": 0.05385875127968356,
+              "bus_gbytes_per_s": 0.04039406345976267,
+              "bus_gbytes_per_s_best": 0.04935762631031996
             },
             {
               "op": "reduce_scatter",
               "numel": 65536,
               "bytes": 262144,
-              "median_s": 0.0013261459826026112,
-              "min_s": 0.0012635000166483223,
-              "algorithm_gbytes_per_s": 0.19767356191475433,
-              "bus_gbytes_per_s": 0.14825517143606573,
-              "bus_gbytes_per_s_best": 0.1556058546968133
+              "median_s": 0.0013171660248190165,
+              "min_s": 0.0009942500037141144,
+              "algorithm_gbytes_per_s": 0.19902122819788004,
+              "bus_gbytes_per_s": 0.14926592114841003,
+              "bus_gbytes_per_s_best": 0.19774503320648962
             },
             {
               "op": "reduce_scatter",
               "numel": 262144,
               "bytes": 1048576,
-              "median_s": 0.002013667020946741,
-              "min_s": 0.0018640829948708415,
-              "algorithm_gbytes_per_s": 0.5207295889004548,
-              "bus_gbytes_per_s": 0.39054719167534113,
-              "bus_gbytes_per_s_best": 0.4218867948283012
+              "median_s": 0.002445708494633436,
+              "min_s": 0.0019965419778600335,
+              "algorithm_gbytes_per_s": 0.4287412021100908,
+              "bus_gbytes_per_s": 0.3215559015825681,
+              "bus_gbytes_per_s_best": 0.39389705236397105
             },
             {
               "op": "reduce_scatter",
               "numel": 1048576,
               "bytes": 4194304,
-              "median_s": 0.004513458494329825,
-              "min_s": 0.00432662497041747,
-              "algorithm_gbytes_per_s": 0.9292882620432262,
-              "bus_gbytes_per_s": 0.6969661965324196,
-              "bus_gbytes_per_s_best": 0.7270627848515544
+              "median_s": 0.004751104483148083,
+              "min_s": 0.004089375026524067,
+              "algorithm_gbytes_per_s": 0.8828060959040103,
+              "bus_gbytes_per_s": 0.6621045719280078,
+              "bus_gbytes_per_s_best": 0.7692441949189094
             },
             {
               "op": "reduce_scatter",
               "numel": 4194304,
               "bytes": 16777216,
-              "median_s": 0.015090103959664702,
-              "min_s": 0.014389124989975244,
-              "algorithm_gbytes_per_s": 1.111802545883374,
-              "bus_gbytes_per_s": 0.8338519094125304,
-              "bus_gbytes_per_s_best": 0.8744737438007097
+              "median_s": 0.01659383301739581,
+              "min_s": 0.014252458000555634,
+              "algorithm_gbytes_per_s": 1.0110512732297563,
+              "bus_gbytes_per_s": 0.7582884549223171,
+              "bus_gbytes_per_s_best": 0.8828590829391992
+            },
+            {
+              "op": "reduce_scatter",
+              "numel": 16777216,
+              "bytes": 67108864,
+              "median_s": 0.06422233351622708,
+              "min_s": 0.06123129103798419,
+              "algorithm_gbytes_per_s": 1.0449458985018596,
+              "bus_gbytes_per_s": 0.7837094238763946,
+              "bus_gbytes_per_s_best": 0.8219922713825729
             }
           ],
-          "peak_bus_gbytes_per_s": 0.8338519094125304,
+          "peak_bus_gbytes_per_s": 0.7837094238763946,
           "fit": {
             "op": "reduce_scatter",
-            "latency_us": 1130.1441238686432,
-            "bandwidth_gbytes_per_s": 0.9029381175869217,
-            "r_squared": 0.9998962807210603,
-            "slope_s_per_byte": 8.306217063959546e-10,
-            "intercept_s": 0.0011301441238686432
+            "latency_us": 1122.7233617372226,
+            "bandwidth_gbytes_per_s": 0.7987280300528532,
+            "r_squared": 0.9998956003119117,
+            "slope_s_per_byte": 9.389929635377529e-10,
+            "intercept_s": 0.0011227233617372226
           }
         }
       },
@@ -598,20 +678,20 @@
       ],
       "fit": {
         "op": "all_reduce",
-        "latency_us": 909.366917523323,
-        "bandwidth_gbytes_per_s": 2.0769486424420722,
-        "r_squared": 0.9997278177015161,
-        "slope_s_per_byte": 7.222133322643466e-10,
-        "intercept_s": 0.0009093669175233229
+        "latency_us": 1400.6627376766494,
+        "bandwidth_gbytes_per_s": 1.9392390185308956,
+        "r_squared": 0.9998581415513291,
+        "slope_s_per_byte": 7.734992879507711e-10,
+        "intercept_s": 0.0014006627376766494
       },
       "measurement_note": "MEASURED on this machine over gloo, device cpu. Bus bandwidth follows NCCL's convention: algorithm bandwidth times the ring factor for the collective, so the three collectives are comparable with each other and across world sizes."
     }
   },
   "fitted_link": {
     "name": "gloo on cpu, 4 ranks",
-    "gbytes_per_s": 2.0769486424420722,
-    "latency_us": 151.56115292055384,
-    "source": "MEASURED by transformer_internals.cluster.collbench, all_reduce at 4 ranks. Fitted t = 909.4us + bytes/2.08 GB/s, R^2 = 0.9997, peak bus 1.93 GB/s. Latency divided by 6 ring hops to give the per-hop figure this model uses. world size 4, 8 timed calls per point",
+    "gbytes_per_s": 1.9392390185308956,
+    "latency_us": 233.4437896127749,
+    "source": "MEASURED by transformer_internals.cluster.collbench, all_reduce at 4 ranks. Fitted t = 1400.7us + bytes/1.94 GB/s, R^2 = 0.9999, peak bus 1.89 GB/s. Latency divided by 6 ring hops to give the per-hop figure this model uses. world size 4, 20 timed calls per point",
     "measured": true
   },
   "model_vs_measurement": {
@@ -620,44 +700,51 @@
       {
         "op": "all_reduce",
         "bytes": 16384,
-        "measured_s": 0.0009887295018415898,
-        "modelled_s": 0.000921199660759142,
-        "modelled_over_measured": 0.9317003882693214
+        "measured_s": 0.001665020507061854,
+        "modelled_s": 0.0014133357500104348,
+        "modelled_over_measured": 0.8488398455250561
       },
       {
         "op": "all_reduce",
         "bytes": 65536,
-        "measured_s": 0.0009758960222825408,
-        "modelled_s": 0.0009566978904665992,
-        "modelled_over_measured": 0.9803276871945448
+        "measured_s": 0.0012754164636135101,
+        "modelled_s": 0.001451354787011791,
+        "modelled_over_measured": 1.1379457835284739
       },
       {
         "op": "all_reduce",
         "bytes": 262144,
-        "measured_s": 0.0010943539964500815,
-        "modelled_s": 0.0010986908092964279,
-        "modelled_over_measured": 1.0039628976185169
+        "measured_s": 0.001266958483029157,
+        "modelled_s": 0.0016034309350172163,
+        "modelled_over_measured": 1.265574962790881
       },
       {
         "op": "all_reduce",
         "bytes": 1048576,
-        "measured_s": 0.0017011459858622402,
-        "modelled_s": 0.0016666624846157425,
-        "modelled_over_measured": 0.9797292522022915
+        "measured_s": 0.002367083536228165,
+        "modelled_s": 0.002211735527038917,
+        "modelled_over_measured": 0.9343715560470723
       },
       {
         "op": "all_reduce",
         "bytes": 4194304,
-        "measured_s": 0.0037856874987483025,
-        "modelled_s": 0.003938549185893001,
-        "modelled_over_measured": 1.0403788445811337
+        "measured_s": 0.004551688034553081,
+        "modelled_s": 0.00464495389512572,
+        "modelled_over_measured": 1.0204903894697162
       },
       {
         "op": "all_reduce",
         "bytes": 16777216,
-        "measured_s": 0.013062083016848192,
-        "modelled_s": 0.013026095991002035,
-        "modelled_over_measured": 0.9972449244274639
+        "measured_s": 0.014636250503826886,
+        "modelled_s": 0.014377827367472933,
+        "modelled_over_measured": 0.9823436243943499
+      },
+      {
+        "op": "all_reduce",
+        "bytes": 67108864,
+        "measured_s": 0.053249541990226135,
+        "modelled_s": 0.05330932125686179,
+        "modelled_over_measured": 1.001122624991716
       }
     ]
   },
@@ -697,17 +784,18 @@
       65536,
       262144,
       1048576,
-      4194304
+      4194304,
+      16777216
     ],
-    "iterations_per_point": 8,
-    "runtime_seconds": 6.37723970413208
+    "iterations_per_point": 20,
+    "runtime_seconds": 10.958027124404907
   },
   "datasheet_comparison": {
     "link": "nvlink4",
     "published_gbytes_per_s": 450.0,
     "published_source": "NVIDIA H100 datasheet: 18 NVLink 4 links x 25 GB/s per direction = 900 GB/s bidirectional aggregate per GPU; NVSwitch gives every GPU in the 8-GPU node that bandwidth all-to-all.",
-    "measured_gbytes_per_s": 2.0769486424420722,
-    "measured_over_published": 0.0046154414276490495,
+    "measured_gbytes_per_s": 1.9392390185308956,
+    "measured_over_published": 0.004309420041179768,
     "note": "Only meaningful when the measurement ran on hardware that has a nvlink4 link. On a CPU machine the measured figure is loopback TCP and the ratio means nothing."
   }
 }

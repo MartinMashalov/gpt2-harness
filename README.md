@@ -740,6 +740,71 @@ about 64 KiB the fit degrades badly, which is the model's own point: small
 messages are latency, not bandwidth, and that is the regime where GPUDirect and
 the hop count decide everything.
 
+### Three collectives, in bus bandwidth, across world sizes
+
+The all-reduce fit above is one collective at one world size. The full sweep is
+in [`results/collective_bandwidth.json`](results/collective_bandwidth.json),
+written by `make collectives`. All-reduce, all-gather and reduce-scatter, over
+message sizes from 16 KB to 256 MB, at world sizes 2 and 4, reported in **bus
+bandwidth**: algorithm bandwidth times the ring factor for the collective, with
+the size taken as the full unsharded buffer in every case. That is NCCL's own
+convention, and it is the one that makes three different collectives comparable,
+because it is flat in the world size where algorithm bandwidth is not.
+
+**MEASURED**, gloo over TCP loopback on this machine, 20 timed calls per point:
+
+| ranks | collective | peak bus GB/s | fitted GB/s | fitted latency | R² |
+|---|---|---|---|---|---|
+| 2 | all-reduce | 3.101 | 2.923 | 143.8 µs | 0.9991 |
+| 2 | all-gather | 2.056 | 2.071 | 143.8 µs | 0.9999 |
+| 2 | reduce-scatter | 1.237 | 1.193 | 143.9 µs | 0.9996 |
+| 4 | all-reduce | 1.890 | 1.939 | 1400.7 µs | 0.9999 |
+| 4 | all-gather | 1.682 | 1.717 | 623.2 µs | 0.9999 |
+| 4 | reduce-scatter | 0.784 | 0.799 | 1122.7 µs | 0.9999 |
+
+Two things fall out of it, and neither was put there on purpose.
+
+**The latency term is the same for all three collectives at world size 2**:
+143.8, 143.8, 143.9 µs. It is a per-call fixed cost, not a per-collective one,
+which is what an affine model of a collective assumes and is not obliged to be
+true.
+
+**Reduce-scatter is the slowest of the three, and by the amount gloo's
+implementation predicts.** `comms.py` has said since it was written that gloo has
+no native ring reduce-scatter and that PyTorch services the call as an all-reduce
+followed by a slice. If that is right, reduce-scatter takes an all-reduce's time
+while being charged half an all-reduce's ring factor, so its bus bandwidth should
+be half: `2.923 / 2 = 1.46 GB/s`. Measured: **1.193**, which is the right kind of
+number and 18% below it, the gap being the slice copy. A docstring claim became a
+measurement.
+
+**The cost model, priced against the measurements it was fitted to.** Turning the
+fit into a `Link` and evaluating `all_reduce_time` at every point in the sweep
+(world size 4, all-reduce):
+
+| bytes | measured | modelled | modelled/measured |
+|---|---|---|---|
+| 16,384 | 1.665 ms | 1.413 ms | 0.85 |
+| 65,536 | 1.275 ms | 1.451 ms | 1.14 |
+| 262,144 | 1.267 ms | 1.603 ms | 1.27 |
+| 1,048,576 | 2.367 ms | 2.212 ms | 0.93 |
+| 4,194,304 | 4.552 ms | 4.645 ms | 1.02 |
+| 16,777,216 | 14.636 ms | 14.378 ms | 0.98 |
+| 67,108,864 | 53.250 ms | 53.309 ms | 1.00 |
+
+The model was fitted to these points, so this is a check on its *form* and not a
+held-out prediction. The reading that matters is where it fails: within 2% on the
+four largest messages, and out by 27% at 262 KB, which is the latency-dominated
+end where the real cost is scheduling rather than either term. That failure is
+the model's own point, and it is the regime where GPUDirect and the hop count
+decide everything.
+
+One implementation detail worth stating because getting it wrong is invisible:
+`Link.latency_us` is a **per-hop** latency, and the intercept of a fit to
+whole-collective times is not. Dividing by the `2(n-1)` ring hops is the
+difference between the table above and one that overpredicts every small message
+by six times.
+
 ---
 
 ## The rest of the repository: the model everything above runs on

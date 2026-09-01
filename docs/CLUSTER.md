@@ -371,6 +371,20 @@ Below about 64 KiB the fit degrades badly — R² of 0.84 over 16 KiB–4 MiB in
 run — which is the model's own point: small messages are latency, not bandwidth,
 and that is the regime where GPUDirect and the number of hops decide everything.
 
+The full sweep is three collectives across message sizes and world sizes, in
+NCCL's bus-bandwidth convention, written to `results/collective_bandwidth.json`
+by `make collectives`. The README's Part 4 carries the table. Two findings from
+it: the fitted latency term is identical for all three collectives at world size
+2 (143.8, 143.8, 143.9 µs), so it really is a per-call fixed cost; and
+reduce-scatter comes in at 1.193 GB/s of bus bandwidth against an all-reduce's
+2.923, which is within 20% of the 2x ratio that gloo servicing reduce-scatter as
+an all-reduce plus a slice would produce. `collbench.py` said that in a docstring
+before it was measured.
+
+On a CUDA node the same command measures NCCL over the real fabric, and
+`fabric.link_from_measurement` turns the fit into a `Link` that replaces the
+datasheet NVLink entry. See `docs/GPU_RUN.md`.
+
 ---
 
 ## 5. cgroups
@@ -498,6 +512,7 @@ make cluster
 .venv/bin/python -m transformer_internals.cluster.checkpoint   # resharding
 .venv/bin/python -m transformer_internals.cluster.fabric       # cost model
 .venv/bin/python -m transformer_internals.cluster.collbench    # measured collectives
+.venv/bin/python scripts/run_collectives.py --world-sizes 2,4  # the full sweep
 bash deploy/cgroups_demo.sh                                    # needs Docker
 ```
 
