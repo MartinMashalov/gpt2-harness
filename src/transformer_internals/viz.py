@@ -42,6 +42,7 @@ __all__ = [
     "fig_induction_heatmap",
     "fig_kv_latency",
     "fig_kv_memory",
+    "fig_parallel_bubble",
     "fig_pareto",
     "fig_pruning_pareto",
     "fig_quantization",
@@ -121,7 +122,7 @@ def save(fig: plt.Figure, path: str | Path) -> Path:
 
 
 # --------------------------------------------------------------------------
-# Part 2 -- verification
+# Part 5 -- verification
 # --------------------------------------------------------------------------
 
 
@@ -210,7 +211,7 @@ def fig_verification(report: dict[str, Any], path: str | Path, web: bool = False
 
 
 # --------------------------------------------------------------------------
-# Part 3 -- induction heads and ablations
+# Part 6 -- induction heads and ablations
 # --------------------------------------------------------------------------
 
 
@@ -315,7 +316,7 @@ def fig_ablations(summary: dict[str, Any], path: str | Path, web: bool = False) 
 
 
 # --------------------------------------------------------------------------
-# Part 4 -- inference efficiency
+# Part 7 -- inference efficiency
 # --------------------------------------------------------------------------
 
 
@@ -618,4 +619,117 @@ def fig_pareto(pareto: dict[str, Any], path: str | Path, web: bool = False) -> P
     )
     ax.annotate(pareto["meta"]["caption"], xy=(0, 1.02), xycoords="axes fraction",
                 fontsize=7.5, color=MUTED)
+    return save(fig, path)
+
+
+def fig_parallel_bubble(payload: dict[str, Any], path: str | Path, web: bool = False) -> Path:
+    """Measured pipeline bubble against ``(p-1)/(m+p-1)``, and what 1F1B buys.
+
+    Two panels, because the two schedules differ in exactly one of them. Left:
+    the bubble, where GPipe and 1F1B lie on top of each other and on the
+    formula. Right: the activation stash, where GPipe grows with ``m`` and 1F1B
+    flattens at ``p``. Plotting them together is the argument for 1F1B.
+
+    Args:
+        payload: ``results/parallel_comms.json``.
+        path: Destination.
+        web: Narrow-column variant, bubble panel only.
+    """
+    rows = payload["pipeline"]["measured_bubble"]
+    n_stages = payload["meta"]["pipeline_stages"]
+
+    use_style(scale=1.15 if web else 1.0)
+    if web:
+        fig, ax = plt.subplots(figsize=(4.6, 3.4))
+        axes = [ax]
+    else:
+        fig, axes = plt.subplots(1, 2, figsize=(9.6, 4.0))
+        ax = axes[0]
+
+    ms = sorted({r["micro_batches"] for r in rows})
+    ax.plot(
+        ms,
+        [(n_stages - 1) / (m + n_stages - 1) for m in ms],
+        color=MUTED,
+        lw=1.4,
+        ls="--",
+        zorder=2,
+        label=f"$(p-1)/(m+p-1)$, $p={n_stages}$",
+    )
+    for kind, colour, marker in (("gpipe", ACCENT, "o"), ("1f1b", INK, "s")):
+        sel = [r for r in rows if r["schedule"] == kind]
+        ax.plot(
+            [r["micro_batches"] for r in sel],
+            [r["measured_bubble"] for r in sel],
+            color=colour,
+            marker=marker,
+            ms=4.5,
+            lw=1.6,
+            zorder=3,
+            label=f"measured, {'GPipe' if kind == 'gpipe' else '1F1B'}",
+        )
+    ax.set_xscale("log", base=2)
+    ax.set_xticks(ms)
+    ax.set_xticklabels([str(m) for m in ms])
+    ax.set_xlabel("micro-batches per step")
+    ax.set_ylabel("fraction of stage-time idle")
+    ax.set_ylim(0, 0.85)
+    ax.set_title("Pipeline bubble: measured against the formula" if not web else "Pipeline bubble")
+    ax.legend(loc="upper right")
+    ax.grid(True, axis="y", color=GRID, linewidth=0.6)
+    ax.grid(False, axis="x")
+    ax.set_axisbelow(True)
+    if web:
+        return save(fig, path)
+
+    ax.text(
+        0.02,
+        0.04,
+        f"{n_stages} gloo processes on CPU. Measured = 1 - sum(compute) / (p x makespan);\n"
+        "the gap above the curve is transfer and per-micro-batch dispatch,\n"
+        "which the formula charges nothing for.",
+        transform=ax.transAxes,
+        fontsize=7.5,
+        color=MUTED,
+        va="bottom",
+    )
+
+    ax2 = axes[1]
+    for kind, colour, marker in (("gpipe", ACCENT, "o"), ("1f1b", INK, "s")):
+        sel = [r for r in rows if r["schedule"] == kind]
+        ax2.plot(
+            [r["micro_batches"] for r in sel],
+            [r["peak_stash"] for r in sel],
+            color=colour,
+            marker=marker,
+            ms=4.5,
+            lw=1.6,
+            zorder=3,
+            label=f"{'GPipe' if kind == 'gpipe' else '1F1B'}",
+        )
+    ax2.axhline(n_stages, color=MUTED, lw=1.0, ls=":", zorder=1)
+    ax2.text(ms[0], n_stages + 0.4, f"$p = {n_stages}$", color=MUTED, fontsize=8, va="bottom")
+    ax2.set_xscale("log", base=2)
+    ax2.set_xticks(ms)
+    ax2.set_xticklabels([str(m) for m in ms])
+    ax2.set_xlabel("micro-batches per step")
+    ax2.set_ylabel("micro-batch activations held at once")
+    ax2.set_title("What 1F1B actually buys")
+    ax2.legend(loc="upper left")
+    ax2.grid(True, axis="y", color=GRID, linewidth=0.6)
+    ax2.grid(False, axis="x")
+    ax2.set_axisbelow(True)
+    ax2.set_ylim(0, max(r["peak_stash"] for r in rows) * 1.18)
+    ax2.text(
+        0.05,
+        0.46,
+        "Same bubble, same gradients. GPipe keeps all m\n"
+        "micro-batches alive until its backward phase;\n"
+        "1F1B starts backward as soon as the pipe is\n"
+        "full, so its stash stops growing at p.",
+        transform=ax2.transAxes,
+        fontsize=7.5,
+        color=MUTED,
+        va="bottom",
+    )
     return save(fig, path)

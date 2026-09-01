@@ -1,0 +1,930 @@
+{
+  "equivalence": {
+    "data_parallel": {
+      "what_is_compared": "gradient of every parameter, and parameters after an SGD step",
+      "reference": "single process, full batch, no collectives",
+      "max_grad_error": 7.82310962677002e-08,
+      "max_param_error": 7.450580596923828e-09,
+      "steps": 4,
+      "world_size": 2
+    },
+    "zero_1": {
+      "what_is_compared": "every parameter after each AdamW step",
+      "reference": "torch.optim.AdamW, single process, full batch",
+      "max_param_error": 1.439591869711876e-06,
+      "per_step_param_error": [
+        1.4386605471372604e-06,
+        1.439591869711876e-06,
+        1.3862736523151398e-06,
+        1.367880031466484e-06
+      ],
+      "steps": 4,
+      "world_size": 2
+    },
+    "zero_2": {
+      "what_is_compared": "every parameter after each AdamW step",
+      "reference": "torch.optim.AdamW, single process, full batch",
+      "max_param_error": 1.439591869711876e-06,
+      "per_step_param_error": [
+        1.4386605471372604e-06,
+        1.439591869711876e-06,
+        1.3862736523151398e-06,
+        1.367880031466484e-06
+      ],
+      "steps": 4,
+      "world_size": 2
+    },
+    "zero_3": {
+      "what_is_compared": "every parameter after each AdamW step, all-gathered so the check covers the shards this rank does not own",
+      "reference": "torch.optim.AdamW, single process, full batch",
+      "max_param_error": 1.439591869711876e-06,
+      "per_step_param_error": [
+        1.4386605471372604e-06,
+        1.439591869711876e-06,
+        1.3862736523151398e-06,
+        1.367880031466484e-06
+      ],
+      "steps": 4,
+      "world_size": 2
+    },
+    "tensor_parallel": {
+      "what_is_compared": "block output, gradient w.r.t. the input, replicated LayerNorm and bias gradients, and this rank's slice of every sharded weight gradient",
+      "reference": "the same block, unsharded, single process",
+      "max_forward_error": 3.5762786865234375e-07,
+      "max_backward_error": 1.9073486328125e-06,
+      "reference_grad_scale": 22.1143798828125,
+      "output_scale": 3.681586265563965,
+      "world_size": 2
+    },
+    "pipeline_gpipe": {
+      "what_is_compared": "every gradient of this rank's stage",
+      "reference": "the whole model, single process, full batch",
+      "max_grad_error": 2.9802322387695312e-08,
+      "reference_grad_scale": 0.1447918564081192,
+      "stage_params": [
+        18848,
+        12704,
+        12704,
+        16864
+      ],
+      "peak_stash": [
+        4,
+        4,
+        4,
+        4
+      ],
+      "world_size": 4
+    },
+    "pipeline_1f1b": {
+      "what_is_compared": "every gradient of this rank's stage",
+      "reference": "the whole model, single process, full batch",
+      "max_grad_error": 2.9802322387695312e-08,
+      "reference_grad_scale": 0.1447918564081192,
+      "stage_params": [
+        18848,
+        12704,
+        12704,
+        16864
+      ],
+      "peak_stash": [
+        4,
+        3,
+        2,
+        1
+      ],
+      "world_size": 4
+    },
+    "context_parallel": {
+      "what_is_compared": "this rank's rows of the attention output (all-gather-KV and ring), the gradient w.r.t. this rank's input slice, and the all-reduced projection weight gradient",
+      "reference": "CausalSelfAttention over the whole sequence, single process",
+      "max_all_gather_forward_error": 0.0,
+      "max_ring_forward_error": 1.1920928955078125e-07,
+      "max_input_grad_error": 2.980232238769531e-07,
+      "max_weight_grad_error": 2.384185791015625e-06,
+      "weight_grad_scale": 14.570199012756348,
+      "backward_note": "the all-gather path is differentiable end to end; the ring path is forward only, since its backward needs a second ring for dK/dV",
+      "world_size": 2
+    },
+    "dtensor": {
+      "what_is_compared": "DTensor placements and parallelize_module against the single-process MLP, and against this repository's hand-written tensor parallelism",
+      "max_dtensor_error": 2.384185791015625e-07,
+      "max_parallelize_module_error": 4.172325134277344e-07,
+      "max_manual_vs_dtensor": 0.0,
+      "device_mesh": [
+        0,
+        1
+      ],
+      "world_size": 2,
+      "api_note": "torch.distributed._tensor on torch 2.2; public as torch.distributed.tensor from 2.5"
+    }
+  },
+  "tolerance": 1e-05,
+  "comms": {
+    "data_parallel": {
+      "world_size": 2,
+      "steps": 4,
+      "per_collective": {
+        "all_reduce": {
+          "calls": 4,
+          "elements": 228096,
+          "payload_bytes": 912384,
+          "wire_bytes_ring_model": 912384.0
+        }
+      },
+      "total_calls": 4,
+      "total_payload_bytes": 912384,
+      "total_wire_bytes_ring_model": 912384.0,
+      "calls_per_step": 1.0,
+      "payload_bytes_per_step": 228096.0,
+      "wire_bytes_per_step_ring_model": 228096.0
+    },
+    "zero_1": {
+      "world_size": 2,
+      "steps": 4,
+      "per_collective": {
+        "all_gather": {
+          "calls": 4,
+          "elements": 228096,
+          "payload_bytes": 912384,
+          "wire_bytes_ring_model": 456192.0
+        },
+        "all_reduce": {
+          "calls": 4,
+          "elements": 228096,
+          "payload_bytes": 912384,
+          "wire_bytes_ring_model": 912384.0
+        }
+      },
+      "total_calls": 8,
+      "total_payload_bytes": 1824768,
+      "total_wire_bytes_ring_model": 1368576.0,
+      "calls_per_step": 2.0,
+      "payload_bytes_per_step": 456192.0,
+      "wire_bytes_per_step_ring_model": 342144.0
+    },
+    "zero_2": {
+      "world_size": 2,
+      "steps": 4,
+      "per_collective": {
+        "all_gather": {
+          "calls": 4,
+          "elements": 228096,
+          "payload_bytes": 912384,
+          "wire_bytes_ring_model": 456192.0
+        },
+        "reduce_scatter": {
+          "calls": 4,
+          "elements": 228096,
+          "payload_bytes": 912384,
+          "wire_bytes_ring_model": 456192.0
+        }
+      },
+      "total_calls": 8,
+      "total_payload_bytes": 1824768,
+      "total_wire_bytes_ring_model": 912384.0,
+      "calls_per_step": 2.0,
+      "payload_bytes_per_step": 456192.0,
+      "wire_bytes_per_step_ring_model": 228096.0
+    },
+    "zero_3": {
+      "world_size": 2,
+      "steps": 4,
+      "per_collective": {
+        "all_gather": {
+          "calls": 32,
+          "elements": 406528,
+          "payload_bytes": 1626112,
+          "wire_bytes_ring_model": 813056.0
+        },
+        "all_reduce": {
+          "calls": 16,
+          "elements": 24832,
+          "payload_bytes": 99328,
+          "wire_bytes_ring_model": 99328.0
+        },
+        "reduce_scatter": {
+          "calls": 16,
+          "elements": 203264,
+          "payload_bytes": 813056,
+          "wire_bytes_ring_model": 406528.0
+        }
+      },
+      "total_calls": 64,
+      "total_payload_bytes": 2538496,
+      "total_wire_bytes_ring_model": 1318912.0,
+      "calls_per_step": 16.0,
+      "payload_bytes_per_step": 634624.0,
+      "wire_bytes_per_step_ring_model": 329728.0
+    },
+    "tensor_parallel": {
+      "world_size": 2,
+      "steps": 1,
+      "per_collective": {
+        "all_reduce": {
+          "calls": 4,
+          "elements": 6144,
+          "payload_bytes": 24576,
+          "wire_bytes_ring_model": 24576.0
+        }
+      },
+      "total_calls": 4,
+      "total_payload_bytes": 24576,
+      "total_wire_bytes_ring_model": 24576.0,
+      "calls_per_step": 4.0,
+      "payload_bytes_per_step": 24576.0,
+      "wire_bytes_per_step_ring_model": 24576.0
+    },
+    "pipeline_gpipe": {
+      "world_size": 4,
+      "steps": 1,
+      "per_collective": {
+        "recv": {
+          "calls": 4,
+          "elements": 4096,
+          "payload_bytes": 16384,
+          "wire_bytes_ring_model": 16384.0
+        },
+        "send": {
+          "calls": 4,
+          "elements": 4096,
+          "payload_bytes": 16384,
+          "wire_bytes_ring_model": 16384.0
+        }
+      },
+      "total_calls": 8,
+      "total_payload_bytes": 32768,
+      "total_wire_bytes_ring_model": 32768.0,
+      "calls_per_step": 8.0,
+      "payload_bytes_per_step": 32768.0,
+      "wire_bytes_per_step_ring_model": 32768.0
+    },
+    "pipeline_1f1b": {
+      "world_size": 4,
+      "steps": 1,
+      "per_collective": {
+        "recv": {
+          "calls": 4,
+          "elements": 4096,
+          "payload_bytes": 16384,
+          "wire_bytes_ring_model": 16384.0
+        },
+        "send": {
+          "calls": 4,
+          "elements": 4096,
+          "payload_bytes": 16384,
+          "wire_bytes_ring_model": 16384.0
+        }
+      },
+      "total_calls": 8,
+      "total_payload_bytes": 32768,
+      "total_wire_bytes_ring_model": 32768.0,
+      "calls_per_step": 8.0,
+      "payload_bytes_per_step": 32768.0,
+      "wire_bytes_per_step_ring_model": 32768.0
+    },
+    "context_parallel": {
+      "world_size": 2,
+      "steps": 1,
+      "per_collective": {
+        "all_gather": {
+          "calls": 2,
+          "elements": 4096,
+          "payload_bytes": 16384,
+          "wire_bytes_ring_model": 8192.0
+        },
+        "all_reduce": {
+          "calls": 1,
+          "elements": 3072,
+          "payload_bytes": 12288,
+          "wire_bytes_ring_model": 12288.0
+        },
+        "recv": {
+          "calls": 2,
+          "elements": 2048,
+          "payload_bytes": 8192,
+          "wire_bytes_ring_model": 8192.0
+        },
+        "reduce_scatter": {
+          "calls": 2,
+          "elements": 4096,
+          "payload_bytes": 16384,
+          "wire_bytes_ring_model": 8192.0
+        },
+        "send": {
+          "calls": 2,
+          "elements": 2048,
+          "payload_bytes": 8192,
+          "wire_bytes_ring_model": 8192.0
+        }
+      },
+      "total_calls": 9,
+      "total_payload_bytes": 61440,
+      "total_wire_bytes_ring_model": 45056.0,
+      "calls_per_step": 9.0,
+      "payload_bytes_per_step": 61440.0,
+      "wire_bytes_per_step_ring_model": 45056.0
+    }
+  },
+  "formula_checks": [
+    {
+      "quantity": "data_parallel.all_reduce",
+      "measured_bytes_per_step": 228096.0,
+      "formula": "4 * N",
+      "formula_bytes_per_step": 228096,
+      "exact_match": true
+    },
+    {
+      "quantity": "zero_1.all_reduce",
+      "measured_bytes_per_step": 228096.0,
+      "formula": "4 * N",
+      "formula_bytes_per_step": 228096,
+      "exact_match": true
+    },
+    {
+      "quantity": "zero_2.reduce_scatter",
+      "measured_bytes_per_step": 228096.0,
+      "formula": "4 * N (padded to a multiple of p)",
+      "formula_bytes_per_step": 228096,
+      "exact_match": true
+    },
+    {
+      "quantity": "zero_2.all_gather",
+      "measured_bytes_per_step": 228096.0,
+      "formula": "4 * N (padded to a multiple of p)",
+      "formula_bytes_per_step": 228096,
+      "exact_match": true
+    },
+    {
+      "quantity": "tensor_parallel.all_reduce",
+      "measured_bytes_per_step": 24576.0,
+      "formula": "4 * 4 * B * T * C  (g forward and f backward, for attention and MLP)",
+      "formula_bytes_per_step": 24576,
+      "exact_match": true
+    },
+    {
+      "quantity": "pipeline.send",
+      "measured_bytes_per_step": 16384.0,
+      "formula": "4 * B * T * C  (one activation per micro-batch, summed over m)",
+      "formula_bytes_per_step": 16384,
+      "exact_match": true
+    },
+    {
+      "quantity": "context_parallel.all_gather",
+      "measured_bytes_per_step": 16384.0,
+      "formula": "2 * 4 * B * T * C  (K and V)",
+      "formula_bytes_per_step": 16384,
+      "exact_match": true
+    },
+    {
+      "quantity": "context_parallel.ring_p2p",
+      "measured_bytes_per_step": 8192.0,
+      "formula": "2 * (p-1)/p * 4 * B * T * C",
+      "formula_bytes_per_step": 8192.0,
+      "exact_match": true
+    }
+  ],
+  "memory": {
+    "zero_1": {
+      "sharded_bytes_per_rank": {
+        "params": 228096,
+        "grads": 228096,
+        "optimizer": 228096,
+        "decay_mask": 114048,
+        "total": 798336
+      },
+      "replicated_bytes_per_rank": {
+        "params": 228096,
+        "grads": 228096,
+        "optimizer": 456192,
+        "decay_mask": 0,
+        "total": 912384
+      },
+      "shard_numel": 28512,
+      "n_params": 57024
+    },
+    "zero_2": {
+      "sharded_bytes_per_rank": {
+        "params": 228096,
+        "grads": 114048,
+        "optimizer": 228096,
+        "decay_mask": 114048,
+        "total": 684288
+      },
+      "replicated_bytes_per_rank": {
+        "params": 228096,
+        "grads": 228096,
+        "optimizer": 456192,
+        "decay_mask": 0,
+        "total": 912384
+      },
+      "shard_numel": 28512,
+      "n_params": 57024
+    },
+    "zero_3": {
+      "sharded_bytes_per_rank": {
+        "params": 126464,
+        "grads": 126464,
+        "optimizer": 252928,
+        "decay_mask": 101632,
+        "total": 607488
+      },
+      "replicated_bytes_per_rank": {
+        "params": 228096,
+        "grads": 228096,
+        "optimizer": 456192,
+        "decay_mask": 0,
+        "total": 912384
+      },
+      "n_params": 57024,
+      "n_block_params": 50816,
+      "units": 4,
+      "shard_numel": [
+        6352,
+        6352,
+        6352,
+        6352
+      ]
+    }
+  },
+  "pipeline": {
+    "measured_bubble": [
+      {
+        "schedule": "gpipe",
+        "micro_batches": 1,
+        "micro_batch_size": 16,
+        "analytic_bubble": 0.75,
+        "measured_bubble": 0.7518308233813853,
+        "makespan_seconds": 0.7840959579916671,
+        "compute_seconds_all_ranks": 0.7783537931391038,
+        "comm_seconds_all_ranks": 1.6495823321165517,
+        "peak_stash": 1
+      },
+      {
+        "schedule": "gpipe",
+        "micro_batches": 2,
+        "micro_batch_size": 8,
+        "analytic_bubble": 0.6,
+        "measured_bubble": 0.6049338760714231,
+        "makespan_seconds": 0.48871391598368064,
+        "compute_seconds_all_ranks": 0.7722972499905154,
+        "comm_seconds_all_ranks": 0.8417727081105113,
+        "peak_stash": 2
+      },
+      {
+        "schedule": "gpipe",
+        "micro_batches": 4,
+        "micro_batch_size": 4,
+        "analytic_bubble": 0.42857142857142855,
+        "measured_bubble": 0.4361089468723046,
+        "makespan_seconds": 0.3449694159789942,
+        "compute_seconds_all_ranks": 0.7781006690929644,
+        "comm_seconds_all_ranks": 0.43248608062276617,
+        "peak_stash": 4
+      },
+      {
+        "schedule": "gpipe",
+        "micro_batches": 8,
+        "micro_batch_size": 2,
+        "analytic_bubble": 0.2727272727272727,
+        "measured_bubble": 0.29327609221374706,
+        "makespan_seconds": 0.2942747920169495,
+        "compute_seconds_all_ranks": 0.8318841239088215,
+        "comm_seconds_all_ranks": 0.24520041298819706,
+        "peak_stash": 8
+      },
+      {
+        "schedule": "gpipe",
+        "micro_batches": 16,
+        "micro_batch_size": 1,
+        "analytic_bubble": 0.15789473684210525,
+        "measured_bubble": 0.18911317552139228,
+        "makespan_seconds": 0.27788854198297486,
+        "compute_seconds_all_ranks": 0.901344629470259,
+        "comm_seconds_all_ranks": 0.14943575172219425,
+        "peak_stash": 16
+      },
+      {
+        "schedule": "1f1b",
+        "micro_batches": 1,
+        "micro_batch_size": 16,
+        "analytic_bubble": 0.75,
+        "measured_bubble": 0.7516547595202934,
+        "makespan_seconds": 0.7360772080137394,
+        "compute_seconds_all_ranks": 0.7312050849432126,
+        "comm_seconds_all_ranks": 1.5735681261285208,
+        "peak_stash": 1
+      },
+      {
+        "schedule": "1f1b",
+        "micro_batches": 2,
+        "micro_batch_size": 8,
+        "analytic_bubble": 0.6,
+        "measured_bubble": 0.6022737219133855,
+        "makespan_seconds": 0.4693268329720013,
+        "compute_seconds_all_ranks": 0.7466544579365291,
+        "comm_seconds_all_ranks": 0.8054052900406532,
+        "peak_stash": 2
+      },
+      {
+        "schedule": "1f1b",
+        "micro_batches": 4,
+        "micro_batch_size": 4,
+        "analytic_bubble": 0.42857142857142855,
+        "measured_bubble": 0.44375395973623344,
+        "makespan_seconds": 0.354245875030756,
+        "compute_seconds_all_ranks": 0.7881914610625245,
+        "comm_seconds_all_ranks": 0.4482627490069717,
+        "peak_stash": 4
+      },
+      {
+        "schedule": "1f1b",
+        "micro_batches": 8,
+        "micro_batch_size": 2,
+        "analytic_bubble": 0.2727272727272727,
+        "measured_bubble": 0.29998974539877576,
+        "makespan_seconds": 0.2987281669629738,
+        "compute_seconds_all_ranks": 0.8364511208492331,
+        "comm_seconds_all_ranks": 0.25655517040286213,
+        "peak_stash": 4
+      },
+      {
+        "schedule": "1f1b",
+        "micro_batches": 16,
+        "micro_batch_size": 1,
+        "analytic_bubble": 0.15789473684210525,
+        "measured_bubble": 0.1949307225275918,
+        "makespan_seconds": 0.2800447909976356,
+        "compute_seconds_all_ranks": 0.9018218301935121,
+        "comm_seconds_all_ranks": 0.15515629085712135,
+        "peak_stash": 4
+      }
+    ],
+    "simulated_bubble": [
+      {
+        "schedule": "gpipe",
+        "n_stages": 2,
+        "micro_batches": 1,
+        "simulated_bubble": 0.5,
+        "analytic_bubble": 0.5,
+        "peak_stash": 1
+      },
+      {
+        "schedule": "gpipe",
+        "n_stages": 2,
+        "micro_batches": 2,
+        "simulated_bubble": 0.33333333333333337,
+        "analytic_bubble": 0.3333333333333333,
+        "peak_stash": 2
+      },
+      {
+        "schedule": "gpipe",
+        "n_stages": 2,
+        "micro_batches": 4,
+        "simulated_bubble": 0.19999999999999996,
+        "analytic_bubble": 0.2,
+        "peak_stash": 4
+      },
+      {
+        "schedule": "gpipe",
+        "n_stages": 2,
+        "micro_batches": 8,
+        "simulated_bubble": 0.11111111111111116,
+        "analytic_bubble": 0.1111111111111111,
+        "peak_stash": 8
+      },
+      {
+        "schedule": "gpipe",
+        "n_stages": 2,
+        "micro_batches": 16,
+        "simulated_bubble": 0.05882352941176472,
+        "analytic_bubble": 0.058823529411764705,
+        "peak_stash": 16
+      },
+      {
+        "schedule": "gpipe",
+        "n_stages": 2,
+        "micro_batches": 32,
+        "simulated_bubble": 0.030303030303030276,
+        "analytic_bubble": 0.030303030303030304,
+        "peak_stash": 32
+      },
+      {
+        "schedule": "gpipe",
+        "n_stages": 4,
+        "micro_batches": 1,
+        "simulated_bubble": 0.75,
+        "analytic_bubble": 0.75,
+        "peak_stash": 1
+      },
+      {
+        "schedule": "gpipe",
+        "n_stages": 4,
+        "micro_batches": 2,
+        "simulated_bubble": 0.6,
+        "analytic_bubble": 0.6,
+        "peak_stash": 2
+      },
+      {
+        "schedule": "gpipe",
+        "n_stages": 4,
+        "micro_batches": 4,
+        "simulated_bubble": 0.4285714285714286,
+        "analytic_bubble": 0.42857142857142855,
+        "peak_stash": 4
+      },
+      {
+        "schedule": "gpipe",
+        "n_stages": 4,
+        "micro_batches": 8,
+        "simulated_bubble": 0.2727272727272727,
+        "analytic_bubble": 0.2727272727272727,
+        "peak_stash": 8
+      },
+      {
+        "schedule": "gpipe",
+        "n_stages": 4,
+        "micro_batches": 16,
+        "simulated_bubble": 0.1578947368421053,
+        "analytic_bubble": 0.15789473684210525,
+        "peak_stash": 16
+      },
+      {
+        "schedule": "gpipe",
+        "n_stages": 4,
+        "micro_batches": 32,
+        "simulated_bubble": 0.08571428571428574,
+        "analytic_bubble": 0.08571428571428572,
+        "peak_stash": 32
+      },
+      {
+        "schedule": "gpipe",
+        "n_stages": 8,
+        "micro_batches": 1,
+        "simulated_bubble": 0.875,
+        "analytic_bubble": 0.875,
+        "peak_stash": 1
+      },
+      {
+        "schedule": "gpipe",
+        "n_stages": 8,
+        "micro_batches": 2,
+        "simulated_bubble": 0.7777777777777778,
+        "analytic_bubble": 0.7777777777777778,
+        "peak_stash": 2
+      },
+      {
+        "schedule": "gpipe",
+        "n_stages": 8,
+        "micro_batches": 4,
+        "simulated_bubble": 0.6363636363636364,
+        "analytic_bubble": 0.6363636363636364,
+        "peak_stash": 4
+      },
+      {
+        "schedule": "gpipe",
+        "n_stages": 8,
+        "micro_batches": 8,
+        "simulated_bubble": 0.4666666666666667,
+        "analytic_bubble": 0.4666666666666667,
+        "peak_stash": 8
+      },
+      {
+        "schedule": "gpipe",
+        "n_stages": 8,
+        "micro_batches": 16,
+        "simulated_bubble": 0.30434782608695654,
+        "analytic_bubble": 0.30434782608695654,
+        "peak_stash": 16
+      },
+      {
+        "schedule": "gpipe",
+        "n_stages": 8,
+        "micro_batches": 32,
+        "simulated_bubble": 0.17948717948717952,
+        "analytic_bubble": 0.1794871794871795,
+        "peak_stash": 32
+      },
+      {
+        "schedule": "1f1b",
+        "n_stages": 2,
+        "micro_batches": 1,
+        "simulated_bubble": 0.5,
+        "analytic_bubble": 0.5,
+        "peak_stash": 1
+      },
+      {
+        "schedule": "1f1b",
+        "n_stages": 2,
+        "micro_batches": 2,
+        "simulated_bubble": 0.33333333333333337,
+        "analytic_bubble": 0.3333333333333333,
+        "peak_stash": 2
+      },
+      {
+        "schedule": "1f1b",
+        "n_stages": 2,
+        "micro_batches": 4,
+        "simulated_bubble": 0.19999999999999996,
+        "analytic_bubble": 0.2,
+        "peak_stash": 2
+      },
+      {
+        "schedule": "1f1b",
+        "n_stages": 2,
+        "micro_batches": 8,
+        "simulated_bubble": 0.11111111111111116,
+        "analytic_bubble": 0.1111111111111111,
+        "peak_stash": 2
+      },
+      {
+        "schedule": "1f1b",
+        "n_stages": 2,
+        "micro_batches": 16,
+        "simulated_bubble": 0.05882352941176472,
+        "analytic_bubble": 0.058823529411764705,
+        "peak_stash": 2
+      },
+      {
+        "schedule": "1f1b",
+        "n_stages": 2,
+        "micro_batches": 32,
+        "simulated_bubble": 0.030303030303030276,
+        "analytic_bubble": 0.030303030303030304,
+        "peak_stash": 2
+      },
+      {
+        "schedule": "1f1b",
+        "n_stages": 4,
+        "micro_batches": 1,
+        "simulated_bubble": 0.75,
+        "analytic_bubble": 0.75,
+        "peak_stash": 1
+      },
+      {
+        "schedule": "1f1b",
+        "n_stages": 4,
+        "micro_batches": 2,
+        "simulated_bubble": 0.6,
+        "analytic_bubble": 0.6,
+        "peak_stash": 2
+      },
+      {
+        "schedule": "1f1b",
+        "n_stages": 4,
+        "micro_batches": 4,
+        "simulated_bubble": 0.4285714285714286,
+        "analytic_bubble": 0.42857142857142855,
+        "peak_stash": 4
+      },
+      {
+        "schedule": "1f1b",
+        "n_stages": 4,
+        "micro_batches": 8,
+        "simulated_bubble": 0.2727272727272727,
+        "analytic_bubble": 0.2727272727272727,
+        "peak_stash": 4
+      },
+      {
+        "schedule": "1f1b",
+        "n_stages": 4,
+        "micro_batches": 16,
+        "simulated_bubble": 0.1578947368421053,
+        "analytic_bubble": 0.15789473684210525,
+        "peak_stash": 4
+      },
+      {
+        "schedule": "1f1b",
+        "n_stages": 4,
+        "micro_batches": 32,
+        "simulated_bubble": 0.08571428571428574,
+        "analytic_bubble": 0.08571428571428572,
+        "peak_stash": 4
+      },
+      {
+        "schedule": "1f1b",
+        "n_stages": 8,
+        "micro_batches": 1,
+        "simulated_bubble": 0.875,
+        "analytic_bubble": 0.875,
+        "peak_stash": 1
+      },
+      {
+        "schedule": "1f1b",
+        "n_stages": 8,
+        "micro_batches": 2,
+        "simulated_bubble": 0.7777777777777778,
+        "analytic_bubble": 0.7777777777777778,
+        "peak_stash": 2
+      },
+      {
+        "schedule": "1f1b",
+        "n_stages": 8,
+        "micro_batches": 4,
+        "simulated_bubble": 0.6363636363636364,
+        "analytic_bubble": 0.6363636363636364,
+        "peak_stash": 4
+      },
+      {
+        "schedule": "1f1b",
+        "n_stages": 8,
+        "micro_batches": 8,
+        "simulated_bubble": 0.4666666666666667,
+        "analytic_bubble": 0.4666666666666667,
+        "peak_stash": 8
+      },
+      {
+        "schedule": "1f1b",
+        "n_stages": 8,
+        "micro_batches": 16,
+        "simulated_bubble": 0.30434782608695654,
+        "analytic_bubble": 0.30434782608695654,
+        "peak_stash": 8
+      },
+      {
+        "schedule": "1f1b",
+        "n_stages": 8,
+        "micro_batches": 32,
+        "simulated_bubble": 0.17948717948717952,
+        "analytic_bubble": 0.1794871794871795,
+        "peak_stash": 8
+      }
+    ]
+  },
+  "projection_gpt2_124m": {
+    "note": "PROJECTED, not measured. These are the same formulas that were checked against the measured byte counts above (see formula_checks, all exact), evaluated at GPT-2 124M with OpenAI's training batch of 512 x 1024 tokens in fp32. They are collective payload bytes per rank per optimiser step; multiply by the ring factors in transformer_internals.parallel.comms for wire bytes.",
+    "config": {
+      "N": 124439808,
+      "B": 512,
+      "T": 1024,
+      "C": 768,
+      "L": 12,
+      "bytes_per_element": 4
+    },
+    "per_step_payload_bytes": {
+      "data_parallel": {
+        "all_reduce": 497759232
+      },
+      "zero_1": {
+        "all_reduce": 497759232,
+        "all_gather": 497759232
+      },
+      "zero_2": {
+        "reduce_scatter": 497759232,
+        "all_gather": 497759232
+      },
+      "zero_3": {
+        "all_gather": 995518464,
+        "reduce_scatter": 497759232
+      },
+      "tensor_parallel": {
+        "all_reduce": 77309411328
+      },
+      "pipeline_parallel_per_boundary": {
+        "send": 1610612736,
+        "recv": 1610612736
+      },
+      "context_parallel_all_gather_kv": {
+        "all_gather": 38654705664,
+        "reduce_scatter": 38654705664
+      }
+    }
+  },
+  "meta": {
+    "backend": "gloo",
+    "device": "cpu",
+    "torch": "2.2.2",
+    "python": "3.12.9",
+    "platform": "macOS-10.16-x86_64-i386-64bit",
+    "processor": "i386",
+    "equivalence_world_size": 2,
+    "pipeline_stages": 4,
+    "model": {
+      "vocab_size": 128,
+      "n_positions": 64,
+      "n_layer": 4,
+      "n_head": 4,
+      "n_kv_head": null,
+      "n_embd": 32,
+      "dropout": 0.0,
+      "layer_norm_epsilon": 1e-05,
+      "norm_position": "pre",
+      "pos_embedding": "learned",
+      "tie_weights": true,
+      "activation": "gelu_tanh",
+      "residual_scaled_init": true,
+      "attn_bias": true,
+      "mlp_bias": true,
+      "use_sdpa": false
+    },
+    "bubble_model": {
+      "n_layer": 8,
+      "n_embd": 128,
+      "n_head": 4,
+      "batch": 16,
+      "seq": 128,
+      "repeats": 3
+    },
+    "measured_vs_modelled": "equivalence errors, collective counts, payload bytes, resident bytes and the bubble scan are MEASURED on this machine. wire_bytes_ring_model and projection_gpt2_124m are MODELLED from the formulas printed beside them.",
+    "runtime_seconds": 48.561614990234375
+  }
+}
