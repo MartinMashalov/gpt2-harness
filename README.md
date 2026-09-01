@@ -64,7 +64,7 @@ were measured on.
 
 ---
 
-## Part 1 — parallelism, proven not asserted
+## Part 1. Parallelism, proven not asserted
 
 Five strategies, in
 [`src/transformer_internals/parallel/`](src/transformer_internals/parallel).
@@ -177,7 +177,7 @@ is the obvious next step. All three are stated in the module docstrings.
 
 ---
 
-## Part 2 — roofline and MFU
+## Part 2. Roofline and MFU
 
 ![Roofline with every transformer operator placed on it](assets/roofline.png)
 
@@ -269,7 +269,7 @@ dispatch time rather than kernel time.
 
 ---
 
-## Part 3 — why is this run slow
+## Part 3. Why is this run slow
 
 The question a training-infrastructure engineer is actually paid to answer. A
 diagnosis tool is only credible if it has been shown to find something, so
@@ -320,7 +320,7 @@ that operator mix and shape.
 
 ---
 
-## Part 4 — the harness: checkpoints, failure and data
+## Part 4. The harness: checkpoints, failure and data
 
 Full write-up with the reasoning behind each design decision:
 **[`docs/CLUSTER.md`](docs/CLUSTER.md)**. Every measured number below is from
@@ -590,18 +590,18 @@ subtly wrong, and a wrong model looks exactly like a right one from the outside.
 
 ---
 
-## Part 5 — the implementation
+## Part 5. The implementation
 
 Pure PyTorch. No `transformers` modelling code, no `nn.MultiheadAttention`, and
-no `F.scaled_dot_product_attention` on the reference path — the q/k/v projection,
+no `F.scaled_dot_product_attention` on the reference path: the q/k/v projection,
 the head reshape, the scaled dot product, the causal mask, the softmax and the
 output projection are all written out in
 [`src/transformer_internals/model.py`](src/transformer_internals/model.py) so
 they can be read and checked line by line. (`scaled_dot_product_attention` is
 available behind a config flag as a speed arm, and a test asserts the two agree.)
 
-- **Byte-level BPE** implemented from scratch — the byte↔unicode bijection, the
-  regex pre-tokenizer, and rank-ordered merges — verified to produce *identical
+- **Byte-level BPE** implemented from scratch: the byte↔unicode bijection, the
+  regex pre-tokenizer, and rank-ordered merges, verified to produce *identical
   token ids* to the reference on emoji, CJK, Cyrillic and control bytes.
   Round-tripping alone would not be enough: a tokenizer can be losslessly wrong.
 - Token + learned positional embeddings, weight tying, pre-LayerNorm blocks,
@@ -619,7 +619,7 @@ Every parameter shape is checked against the published model:
 
 ---
 
-## Part 6 — verification
+## Part 6. Verification
 
 This is the headline. The published OpenAI GPT-2 124M weights are loaded into
 this implementation, and it is proven to compute the same function as
@@ -631,8 +631,8 @@ Four levels of evidence, each strictly harder to pass than the last.
 | Level | What is checked | Result |
 |---|---|---|
 | **1. Activations** | every sub-module of every block, on a fixed batch | worst **7.63e-05** (`h.11.attn`), against activations of scale up to 3.0e+03 |
-| **2. Final logits** | max abs difference, asserted in a test | **6.10e-05** — tolerance 1e-03 |
-| **3. Greedy generation** | token-exact, 300 tokens, 5 prompts | **all 5 exact** — 1500 consecutive argmax agreements |
+| **2. Final logits** | max abs difference, asserted in a test | **6.10e-05**, tolerance 1e-03 |
+| **3. Greedy generation** | token-exact, 300 tokens, 5 prompts | **all 5 exact**, 1500 consecutive argmax agreements |
 | **4. Perplexity** | held-out slice, both implementations | **19.5673** vs **19.5673**, differing by 1.2e-06 over 4,096 tokens |
 
 Run it with `make verify`; the numbers above are read from
@@ -642,7 +642,7 @@ Run it with `make verify`; the numbers above are read from
 ones. We compute `(q @ kᵀ) / sqrt(d)` where the reference computes
 `(q @ kᵀ) * (1/sqrt(d))`; our GELU is a different expression tree; matmul
 reductions block differently. The observed error grows with depth exactly as
-accumulated fp32 rounding should — visible in the headline figure — and lands at
+accumulated fp32 rounding should, visible in the headline figure, and lands at
 6.1e-05 on logits whose own scale is ~1.7e+02, i.e. a relative error near 1e-06.
 A bit-exact assertion would be the wrong test: it would fail on hardware that is
 perfectly correct.
@@ -650,8 +650,8 @@ perfectly correct.
 **The suite is shown to reject a wrong model.** A verification suite that has
 never rejected anything is not evidence, so
 [`tests/test_verification.py`](tests/test_verification.py) includes a negative
-control: transposing *one* square projection — the classic bug that survives
-because 768×768 still multiplies — must push the logits outside tolerance and
+control: transposing *one* square projection. This is the classic bug that survives
+because 768×768 still multiplies, must push the logits outside tolerance and
 break token-exact generation. It does.
 
 ### Two real bugs this caught
@@ -659,18 +659,18 @@ break token-exact generation. It does.
 Both would have passed a loss-curve-and-samples demonstration.
 
 1. **The KV cache read its offset from layer 0.** `cache.seq_len` looked at
-   layer 0's stored keys — which layer 0 had *already updated* for the current
+   layer 0's stored keys, which layer 0 had *already updated* for the current
    step. So every layer after the first computed `past_len` too large by `T` and
    sliced its causal mask at the wrong position. The model still produced fluent
    English. The cached-vs-uncached equality test caught it immediately.
 2. **The loader silently dropped the qkv bias.** The ignore-list matched the
    suffix `attn.bias`, which also matches `attn.c_attn.bias`. The model loaded
-   without error, ran, and generated text — with no query/key/value bias in any
+   without error, ran, and generated text, with no query/key/value bias in any
    block.
 
 ---
 
-## Part 7 — using it as an instrument
+## Part 7. using it as an instrument
 
 ### What each design decision is worth
 
@@ -685,7 +685,7 @@ version: [`assets/ablations_web.png`](assets/ablations_web.png).*
 
 | Configuration | Val loss (3 seeds) | Δ vs baseline | Verdict | s/run |
 |---|---|---|---|---|
-| GPT-2 defaults | 4.0226 ± 0.0362 | — | reference | 44.7 |
+| GPT-2 defaults | 4.0226 ± 0.0362 |, | reference | 44.7 |
 | sinusoidal positions | 5.8588 ± 0.0148 | **+1.8362** | worse | 36.6 |
 | post-LN | 4.6267 ± 0.0216 | **+0.6041** | worse | 40.0 |
 | no residual-scaled init | 4.1063 ± 0.0308 | **+0.0837** | worse | 35.5 |
@@ -696,7 +696,7 @@ version: [`assets/ablations_web.png`](assets/ablations_web.png).*
 | untied embeddings | 3.9439 ± 0.0362 | **−0.0787** | better | 37.2 |
 
 *6 layers, 256 wide, 250 steps, TinyStories. "Indistinguishable" means
-`|Δ|` did not exceed the pooled seed-to-seed standard deviation — a deliberately
+`|Δ|` did not exceed the pooled seed-to-seed standard deviation, a deliberately
 conservative bar, stated once in the code so it cannot drift.*
 
 Three findings worth stating plainly:
@@ -713,7 +713,7 @@ Three findings worth stating plainly:
   regularisation tying provides. It is a reminder that GPT-2's choices were made
   at GPT-2's scale.
 
-The two decisions that mattered enormously — learned positions and pre-LN — are
+The two decisions that mattered enormously, learned positions and pre-LN, are
 both about **how information moves through depth**, not about capacity.
 
 ### Finding induction heads
@@ -730,15 +730,13 @@ at position `i` must attend to position `i − (T−1)`.
 sequence. Chance is 0.011. Source:
 [`results/induction.json`](results/induction.json).*
 
-**The induction heads in GPT-2 small are L5H5, L6H9, L7H10, L5H1 and L7H2** —
-scoring 0.94, 0.93, 0.92, 0.91 and 0.85 against a chance level of 0.011, i.e.
+**The induction heads in GPT-2 small are L5H5, L6H9, L7H10, L5H1 and L7H2**, scoring 0.94, 0.93, 0.92, 0.91 and 0.85 against a chance level of 0.011, i.e.
 ~80× chance. The other half of the circuit is also visible: the strongest
 **previous-token head is L4H11 at 0.99**, sitting below the induction heads, which
 is exactly the ordering the circuit requires in order to compose.
 
 Behaviourally, the mechanism does what it claims: on the repeated sequence, the
-model's loss falls from **12.262 nats on the first copy to 0.365 on the second** —
-an induction bump of 11.9 nats on tokens that are, by construction,
+model's loss falls from **12.262 nats on the first copy to 0.365 on the second**, an induction bump of 11.9 nats on tokens that are, by construction,
 unpredictable.
 
 Two honest negatives:
@@ -746,30 +744,30 @@ Two honest negatives:
 - **The copying score works, but it does not select the induction heads.**
   Passing token embeddings through a head's OV circuit `W_U W_O W_V W_E` and
   asking how often the token's own identity comes out on top does find a real and
-  distinct population of copying heads — **L11H3 (0.639), L11H10 (0.605), L7H8
+  distinct population of copying heads, **L11H3 (0.639), L11H10 (0.605), L7H8
   (0.552)**, with 17% of all heads above 0.1 against a median of 0.001. But all
   five prefix-matching heads score essentially zero on it (L5H5: 0.008, L7H2:
   0.000). Folding the LayerNorm gains into the circuit does not rescue the
-  induction heads — they stay at **0.005 or below** — though it does move
+  induction heads, they stay at **0.005 or below**, though it does move
   individual heads by up to 0.426 and shifts the ranking (rank correlation
   0.879), so it is a real refinement rather than a no-op. Both versions are
   computed and committed (`copying`, `copying_ln_folded` in
   [`results/induction.json`](results/induction.json)). The construction only sees
   the *direct* path to the unembedding, whereas an
   induction head writes into a residual stream that later layers read and
-  transform — so "attends to the right place" and "copies via its own direct
+  transform, so "attends to the right place" and "copies via its own direct
   path" turn out to be nearly disjoint properties in GPT-2 small. The one head
   scoring highly on both is **L11H10** (prefix 0.414, copying 0.605).
 - **Attending to the right place is not the same as mattering.** Zeroing each
   head in turn and measuring the damage to second-copy loss gives a *different*
   ranking: the most damaging heads are **L0H0 (+0.81 nats)** and **L1H10
-  (+0.42)**, which have near-zero prefix-matching scores — they are upstream of
+  (+0.42)**, which have near-zero prefix-matching scores, they are upstream of
   the circuit. Only **L5H1 (+0.41)** appears near the top of both lists. The
   attention pattern identifies the mechanism; only ablation shows it is used.
 
 ---
 
-## Part 8 — inference efficiency
+## Part 8. inference efficiency
 
 ### The KV cache, measured rather than asserted
 
@@ -787,9 +785,9 @@ Two honest negatives:
 | 512 | 63.84 | 36.87 | **1.73×** |
 | 768 | 131.09 | 34.67 | **3.78×** |
 
-The cached arm is **flat** — ~32 ms per token regardless of context, the signature
+The cached arm is **flat**, ~32 ms per token regardless of context, the signature
 of O(1) per-token work, though only 3 repeats were taken and the run-to-run spread
-reaches 40% of the median at the longest prompt — while the uncached arm grows
+reaches 40% of the median at the longest prompt, while the uncached arm grows
 linearly per token and
 therefore quadratically in total. **The crossover is around 256–512 tokens**: below
 that the cache buys nothing on this hardware, because the per-step overhead of
@@ -822,7 +820,7 @@ why modern models use grouped-query attention, and the saving is exact:
 | MQA | 1 | 50.3 MB | **12×** |
 
 Both variants are implemented (`n_kv_head`), and the cache stores the
-*unexpanded* keys and values — expanding before caching would pay the quality
+*unexpanded* keys and values, expanding before caching would pay the quality
 cost while throwing away the entire memory win.
 
 ### Quantization: the granularity of the scale is the whole story
@@ -830,18 +828,18 @@ cost while throwing away the entire memory win.
 ![Quantization results](assets/quantization.png)
 
 *Symmetric linear quantization implemented directly (`quantize_tensor`,
-`pack_int4`). Sizes are real files on disk — int4 codes are genuinely packed two
+`pack_int4`). Sizes are real files on disk, int4 codes are genuinely packed two
 per byte. Source: [`results/quantization.json`](results/quantization.json).*
 
-> The fp32 perplexity differs between sections — 19.57 in the verification
-> table, 18.27 here, 18.74 on the frontier below — because each experiment scores
+> The fp32 perplexity differs between sections, 19.57 in the verification
+> table, 18.27 here, 18.74 on the frontier below, because each experiment scores
 > its own held-out slice (4,096 / 8,192 / 6,144 tokens). Comparisons are only ever
 > made *within* a section, and the frontier re-scores every configuration itself
 > for exactly this reason.
 
 | Scheme | Perplexity | Paired Δ loss (nats, ±2 s.e.) | On disk | Compression |
 |---|---|---|---|---|
-| fp32 reference | 18.27 | — | 497.8 MB | 1.00× |
+| fp32 reference | 18.27 |, | 497.8 MB | 1.00× |
 | int8 per-channel | 18.31 | **+0.0019 ± 0.0008** | 243.4 MB | 2.05× |
 | int8 per-tensor | 20.44 | +0.1122 ± 0.0088 | 243.0 MB | 2.05× |
 | int4 per-channel | 24.01 | +0.2732 ± 0.0167 | 200.9 MB | 2.48× |
@@ -850,29 +848,29 @@ per byte. Source: [`results/quantization.json`](results/quantization.json).*
 
 The Δ column is the **paired** per-chunk loss change: every scheme is scored on
 the same 8 chunks, so the chunk-to-chunk variation is common to both arms and
-cancels. That matters — the unpaired spread of perplexity across chunks is ±2.35,
+cancels. That matters, the unpaired spread of perplexity across chunks is ±2.35,
 which is larger than four of these five effects and would have hidden all of them.
 
 With 8 paired chunks the test resolves shifts of ~0.001 nats, so *every* scheme
 here is statistically distinguishable from fp32, **int8 per-channel included**.
 Statistical and practical significance are different questions: int8 per-channel
-costs +0.0019 nats, which is +0.03 perplexity on a baseline of 18.27 — detectable,
+costs +0.0019 nats, which is +0.03 perplexity on a baseline of 18.27, detectable,
 and negligible. The table reports both numbers so a reader can apply their own
 threshold; the highlighted row uses a stated one (0.01 nats, ≈1% perplexity).
 
 **Per-channel scaling is what makes the bit width usable.** At 8 bits, moving from
 per-channel to a single per-tensor scale costs **59× more** (+0.1122 vs +0.0019
 nats). At 4 bits it stops being a tradeoff and becomes a cliff: per-channel
-degrades gracefully to perplexity 24.0, **per-tensor collapses to 2291.8** — one
+degrades gracefully to perplexity 24.0, **per-tensor collapses to 2291.8**, one
 outlier weight sets the step size for the entire matrix and everything else
 quantizes to near-zero.
 
 Note the compression ratios: int8 only reaches 2.05×, not 4×, because the 38.6M-parameter
 embedding stays in fp32. Quantizing it too reaches 3.90× for +1.41
-perplexity — and under weight tying that tensor is also the output head, which is
+perplexity, and under weight tying that tensor is also the output head, which is
 why it is the most sensitive one in the model.
 
-**On speed:** these are *simulated* quantization measurements — weights are
+**On speed:** these are *simulated* quantization measurements, weights are
 quantize-dequantized, so the forward pass computes exactly what a real integer
 kernel would compute from the same weights, but runs at fp32 speed. PyTorch 2.2
 ships no int4 kernel and no int8 MPS kernel, so a tokens/sec speedup cannot be
@@ -883,8 +881,8 @@ real and hardware-independent.
 
 ![Pruning Pareto](assets/pruning_pareto.png)
 
-Heads and MLP neurons are ranked by `|∂L/∂ξ|` — the gradient of the loss with
-respect to a multiplicative mask held at 1 (Michel et al., 2019) — normalised
+Heads and MLP neurons are ranked by `|∂L/∂ξ|`, the gradient of the loss with
+respect to a multiplicative mask held at 1 (Michel et al., 2019), normalised
 within each layer, then pruned globally. Structured, not unstructured: removing a
 whole head or neuron removes whole rows and columns, so the FLOPs actually go
 away.
@@ -898,15 +896,14 @@ away.
 | 50% | 11.4% → 5.8450 | 22.8% → 6.2595 |
 
 **MLP neurons prune far more gracefully than attention heads.** Removing 9.1% of
-parameters as neurons costs 0.31 nats; removing 4.6% as heads costs 1.22 nats —
-**half as many parameters removed, four times the damage**. GPT-2 small does not
+parameters as neurons costs 0.31 nats; removing 4.6% as heads costs 1.22 nats. **Half as many parameters removed, four times the damage**. GPT-2 small does not
 have redundant heads to spare.
 
 **Tying this back to the induction result.** Pruning heads destroys induction
 behaviour quickly: second-copy loss on the repeated-sequence probe rises from
 0.378 (unpruned) to **3.69 at 10% head sparsity** and 17.80 at 70%. (This probe
 uses 4 sequences; the 0.365 quoted earlier uses 8, which is why the two unpruned
-baselines differ slightly — they are the same measurement at different batch
+baselines differ slightly, they are the same measurement at different batch
 sizes.) And the
 gradient criterion, which ranks heads by their contribution to *language-modelling*
 loss, correlates only **+0.11 (Spearman)** with direct-ablation damage to
@@ -916,15 +913,15 @@ criterion optimised for one will happily delete the heads that carry the other.
 ### Distillation
 
 The same 4-layer student trained twice under an identical budget with identical
-batches — once on hard labels, once against the verified teacher's distribution,
-with α swept — on CPU, because this experiment needs the full 50257-token
+batches, once on hard labels, once against the verified teacher's distribution,
+with α swept, on CPU, because this experiment needs the full 50257-token
 vocabulary and that is exactly where MPS stops being reproducible (see below).
 
 ![Distillation](assets/distillation.png)
 
 | Arm | Val loss (2 seeds) | Δ vs from-scratch | Verdict | s/run |
 |---|---|---|---|---|
-| from scratch | 5.0130 ± 0.0231 | — | reference | 68 |
+| from scratch | 5.0130 ± 0.0231 |, | reference | 68 |
 | distilled α=0.1 | 4.9946 ± 0.0208 | -0.0184 | *indistinguishable* | 177 |
 | distilled α=0.5 | 5.2576 ± 0.0258 | +0.2446 | worse | 175 |
 | distilled α=0.9 | 6.0593 ± 0.0020 | +1.0463 | worse | 167 |
@@ -934,12 +931,12 @@ vocabulary and that is exactly where MPS stops being reproducible (see below).
 
 **Distillation did not help at this budget.** The best arm (α=0.1) finishes
 0.0184 nats below the control, against a pooled standard deviation
-of 0.0311 — inside the noise, so *indistinguishable*. Raising α makes
+of 0.0311, inside the noise, so *indistinguishable*. Raising α makes
 it monotonically worse: at α=0.9, where the soft targets dominate the hard
 labels, the student is 1.05 nats behind. And it costs **2.6× the
 wall-clock**, because every step runs a 124M-parameter teacher forward to train a
 16.1M-parameter student. (The student is larger than the ablation models because
-it must share the teacher's full 50257-token vocabulary — 12.9M of its parameters
+it must share the teacher's full 50257-token vocabulary, 12.9M of its parameters
 are the embedding alone.)
 
 This is a negative result at a small budget, not a refutation of distillation.
@@ -960,7 +957,7 @@ those numbers on one chart would be a quiet apples-to-oranges comparison. Source
 [`results/pareto.json`](results/pareto.json).*
 
 **No pruning configuration is on the Pareto front.** Every one of the eight
-pruned models is dominated — there is a quantized model that is both smaller and
+pruned models is dominated, there is a quantized model that is both smaller and
 better. int8 per-channel is 243 MB at perplexity 18.8 against the fp32 baseline's
 498 MB at 18.7; the best pruned model that gets anywhere near that size is
 `neur -50%` at 384 MB and perplexity 506.8.
@@ -983,19 +980,19 @@ uncached generation are *token-identical*, which is now a test.
 appending the last entry.** Comparing our raw block-11 residual against
 `hidden_states[-1]` reported a difference of 3.7e+02 on a model that was
 completely correct. Verification harnesses have bugs too, and a harness bug looks
-exactly like a real one — the fix was to capture `ln_f`'s *input*.
+exactly like a real one, the fix was to capture `ln_f`'s *input*.
 
 **The GELU you pick is not cosmetic.** GPT-2 shipped the tanh approximation, not
 the exact erf form. The two differ by up to **4.74e-04** (at x = 2.70), which is
 almost an order of magnitude larger than the 6.1e-05 this implementation actually
-achieves on the final logits — so picking the wrong one turns a verified model
+achieves on the final logits, so picking the wrong one turns a verified model
 into an unverified one.
 
 **Non-determinism will quietly destroy an ablation table.** The first version of
 the ablation grid ran on MPS at lr 6e-4 and produced **3.89 and 5.95 from two runs
-at the same seed**. The cause: the MPS backward is not bit-deterministic — its
+at the same seed**. The cause: the MPS backward is not bit-deterministic, its
 bias gradients are atomic reductions, and repeated identical backward passes
-differ by ~3e-03 — and an optimisation sitting near an instability amplifies that
+differ by ~3e-03, and an optimisation sitting near an instability amplifies that
 into an entirely different trajectory. The fix was a stabler learning rate and a
 smaller output layer, after which repeated runs in one process are bit-identical
 and across processes agree to ~2e-04, two orders of magnitude below the 0.036
@@ -1131,7 +1128,7 @@ default so the fp32 tolerances mean what they say.
 
 ```
 src/transformer_internals/
-  parallel/        Part 1 — DDP, ZeRO 1/2/3, tensor, pipeline, context, DTensor
+  parallel/        Part 1. DDP, ZeRO 1/2/3, tensor, pipeline, context, DTensor
     comms.py         counted collective wrappers + the mp.spawn launcher
     common.py        deterministic model/batch, byte and memory accounting
     zero.py          ZeRO-1, -2 and -3 against a hand-written AdamW
@@ -1139,36 +1136,36 @@ src/transformer_internals/
     pipeline_parallel.py  GPipe and 1F1B, and the bubble measurement
     sequence_parallel.py  all-gather-KV and ring context parallelism
     dtensor_demo.py       the same sharding as DTensor placements
-  perf/            Parts 2-3 — roofline, MFU, profiling, diagnosis
+  perf/            Parts 2-3, roofline, MFU, profiling, diagnosis
     roofline.py      measured peaks, operator intensities, bound classification
     mfu.py           exact per-layer FLOP count against 6ND
     profiling.py     torch.profiler wrapper + Chrome trace
     diagnose.py      findings, severities, and the collective probe
-  cluster/         Part 4 — the harness
+  cluster/         Part 4, the harness
     checkpoint.py    sharded save, reshard across world sizes, async save
     streaming.py     sharded resumable dataloader, elastic replanning
     failure.py       real multi-process trainer, SIGKILL injection, restart
     fabric.py        analytic interconnect cost model (modelled)
     collbench.py     measured gloo collectives + least-squares fit
     cgroups.py       cgroup v2 reader and the OOM/throttle explanation
-  config.py        GPTConfig / TrainConfig — every ablation switch, documented
+  config.py        GPTConfig / TrainConfig, every ablation switch, documented
   tokenizer.py     byte-level BPE from scratch
   model.py         attention, blocks, KV cache, GQA/MQA, the model
   sampling.py      greedy / temperature / top-k / top-p, cached decoding
   train.py         AdamW, cosine schedule, clipping, accumulation
   data.py          corpus loading, compact vocabulary, batching
   weights.py       load the published GPT-2 checkpoint into our modules
-  verify.py        Part 6 — the equivalence harness
-  ablations.py     Part 7 — the grid and its verdict rule
-  induction.py     Part 7 — prefix-matching, copying, causal head ablation
-  benchmark.py     Part 8 — latency, throughput, cache memory
-  quantization.py  Part 8 — int8/int4, packing, perplexity with error bars
-  pruning.py       Part 8 — gradient-based importance, structured masks
-  distill.py       Part 8 — teacher/student
+  verify.py        Part 6, the equivalence harness
+  ablations.py     Part 7, the grid and its verdict rule
+  induction.py     Part 7, prefix-matching, copying, causal head ablation
+  benchmark.py     Part 8, latency, throughput, cache memory
+  quantization.py  Part 8, int8/int4, packing, perplexity with error bars
+  pruning.py       Part 8, gradient-based importance, structured masks
+  distill.py       Part 8, teacher/student
   viz.py           every figure, from committed results only
 
 scripts/           one runner per experiment + make_figures + make_pareto
-results/           committed JSON — every number in this README comes from here
+results/           committed JSON, every number in this README comes from here
 assets/            committed figures, each with a *_web.png variant
 deploy/            Slurm, Ray, Kubernetes, Dask, and the cgroups demo
 docs/CLUSTER.md    the harness write-up: design decisions and their reasoning
@@ -1179,7 +1176,7 @@ tests/             215 tests; the weight-dependent ones are marked `weights`
 
 ```
 pytest -q                    # 215 passed in 85 s
-pytest -q -m "not weights"   # 206 passed — what CI runs, offline, CPU-only
+pytest -q -m "not weights"   # 206 passed, what CI runs, offline, CPU-only
 ```
 
 136 of those tests cover the training-infrastructure half. `tests/test_parallel.py`
@@ -1235,4 +1232,4 @@ with a negative control that must fail on a deliberately broken model.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT, see [LICENSE](LICENSE).
