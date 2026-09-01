@@ -1286,10 +1286,11 @@ cd gpt2-harness
 make install          # creates .venv, installs with dev + verify extras
 
 make test-fast        # what CI runs: no weights, no network (60 s measured)
-make parallel         # Part 1: every parallelism strategy vs a single process (49 s measured)
+make parallel         # Part 1: every parallelism strategy vs a single process (104 s measured)
 make roofline         # Part 2: measured roofline, operator table, MFU (~3 min)
 make diagnose         # Part 3: inject four pathologies, find all four (~5 min)
 make cluster          # Part 4: reshard, kill a rank, restart, fit the collective model (28 s measured)
+make collectives      # Part 4: all-reduce, all-gather, reduce-scatter, in bus bandwidth
 make verify           # Part 6: prove equivalence to GPT-2 (~2 min + checkpoint download)
 make induction        # Part 7: find the induction heads (~5 min)
 make ablate           # Part 7: 9 configurations x 3 seeds (18 min measured)
@@ -1300,6 +1301,24 @@ make distill          # Part 8: distillation vs from-scratch (20 min measured, C
 make pareto           # Part 8: one comparable size/quality frontier (~4 min)
 make figures          # redraw every figure from committed results
 ```
+
+On a GPU box, one command does all of it. See
+[`docs/GPU_RUN.md`](docs/GPU_RUN.md) for which box, what it costs, and what
+changes from modelled to measured.
+
+```bash
+make dry-run          # resolve every CUDA decision against a fabricated 8-GPU node
+make smoke            # the whole infrastructure pipeline at tiny sizes (5m29s measured)
+make preflight        # what is this machine, and can it run the sweep
+make gpu              # the full sweep: 17 stages, resumable, timed, diffed
+make compare          # what changed against the committed baseline
+```
+
+`make dry-run` and `make smoke` need no GPU and are the point: every CUDA
+decision the real run makes is a pure function of a machine description, so a
+fabricated eight-GPU node exercises all of them on a laptop. `make gpu` is
+idempotent and resumable, writes a log and a timing per stage, and its last
+stage fails if any correctness number moved between backends.
 
 Generating text with the verified model:
 
@@ -1340,14 +1359,17 @@ src/transformer_internals/
     mfu.py           exact per-layer FLOP count against 6ND
     profiling.py     torch.profiler wrapper + Chrome trace
     diagnose.py      findings, severities, and the collective probe
+    activation_memory.py  saved-tensor meter + an analytic count that equals it
   cluster/         Part 4, the harness
     checkpoint.py    sharded save, reshard across world sizes, async save
     streaming.py     sharded resumable dataloader, elastic replanning
     failure.py       real multi-process trainer, SIGKILL injection, restart
-    fabric.py        analytic interconnect cost model (modelled)
-    collbench.py     measured gloo collectives + least-squares fit
+    fabric.py        analytic interconnect cost model (modelled), and a measured link
+    collbench.py     three collectives across sizes and world sizes, in bus bandwidth
     cgroups.py       cgroup v2 reader and the OOM/throttle explanation
   config.py        GPTConfig / TrainConfig, every ablation switch, documented
+  hardware.py      backend and device selection as pure functions of the machine
+  precision.py     the mixed-precision policy: bf16, fp32 masters, reduce dtype
   tokenizer.py     byte-level BPE from scratch
   model.py         attention, blocks, KV cache, GQA/MQA, the model
   sampling.py      greedy / temperature / top-k / top-p, cached decoding
@@ -1364,28 +1386,46 @@ src/transformer_internals/
   viz.py           every figure, from committed results only
 
 scripts/           one runner per experiment + make_figures + make_pareto
+  run_on_gpu.sh    the whole suite on a rented box: staged, timed, resumable
+  gpu_preflight.py what this machine is, and the same against a stubbed one
+  compare_results.py  diff two result trees; fails if a correctness number moved
 results/           committed JSON, every number in this README comes from here
 assets/            committed figures, each with a *_web.png variant
 deploy/            Slurm, Ray, Kubernetes, Dask, and the cgroups demo
 docs/CLUSTER.md    the harness write-up: design decisions and their reasoning
-tests/             215 tests; the weight-dependent ones are marked `weights`
+docs/GPU_RUN.md    renting a GPU box: which shape, what it costs, what changes
+tests/             282 tests; the weight-dependent ones are marked `weights`
 ```
 
 ## Tests
 
 ```
-pytest -q                    # 215 passed in 85 s
-pytest -q -m "not weights"   # 206 passed, what CI runs, offline, CPU-only
+pytest -q                    # 282 passed in 144 s
+pytest -q -m "not weights"   # 273 collected, what CI runs, offline, CPU-only
 ```
 
-136 of those tests cover the training-infrastructure half. `tests/test_parallel.py`
-(57) spawns real `torch.distributed` process groups on gloo and compares every
-strategy against a single-process reference; `tests/test_cluster.py` (40) reshards
-checkpoints, kills a rank with a real SIGKILL and asserts the resumed loss
-trajectory is bit-identical; `tests/test_perf.py` (39) checks the roofline
-arithmetic, the FLOP count against `6ND`, and that the diagnosis tool ranks an
-injected fault first. All of it runs offline on CPU with world sizes of 2 and 4,
-which is what lets CI run it on a runner with no GPU.
+203 of those tests cover the training-infrastructure half.
+`tests/test_parallel.py` (70) spawns real `torch.distributed` process groups and
+compares every strategy against a single-process reference, and also measures
+what a bf16 wire costs and that a sharded gradient clip reproduces
+`torch.nn.utils.clip_grad_norm_`; `tests/test_cluster.py` (46) reshards
+checkpoints, kills a rank with a real SIGKILL, asserts the resumed loss
+trajectory is bit-identical, and checks the cost model's form against a real
+collective sweep; `tests/test_perf.py` (39) checks the roofline arithmetic, the
+FLOP count against `6ND`, and that the diagnosis tool ranks an injected fault
+first. All of it runs offline on CPU with world sizes of 2 and 4, which is what
+lets CI run it on a runner with no GPU.
+
+Three files exist to keep the parts that will one day run on a GPU honest today.
+`tests/test_hardware.py` (18) exercises every backend, placement and refusal
+decision against a fabricated eight-GPU node, so the CUDA branch's *logic* is
+tested even though its two torch calls are not.
+`tests/test_precision.py` (14) checks the mixed-precision policy table the same
+way and then measures the bf16 gradient against fp32 on CPU, where the code path
+is the same one CUDA takes.
+`tests/test_activation_memory.py` (16) asserts that the analytic activation
+count equals the measured one **exactly**, to the byte, across eight
+architecture variants.
 
 The rest includes: BPE round-trip *and* exact agreement with the reference
 segmentation; the causal mask asserted directly (no position attends to the
