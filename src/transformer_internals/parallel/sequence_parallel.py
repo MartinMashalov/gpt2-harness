@@ -157,6 +157,17 @@ def ring_attention(
     carry ``dK``/``dV`` and is not implemented here; the all-gather path is the
     differentiable one.
 
+    Two more things to know before this runs on NCCL. The rotation issues both
+    sends non-blocking and then blocks on both receives, which is deadlock-free
+    on gloo and should be on NCCL, since each peer pair gets its own
+    communicator; ``dist.batch_isend_irecv`` is the documented way to express it
+    and would be the safer form. And the transfers are not overlapped with the
+    attention that could hide them: this rotation waits for the block it is
+    about to use rather than for the block after it. So what is implemented here
+    is ring attention's communication pattern and its numerics, which is what the
+    equivalence test checks, and not its performance argument. Both are in the
+    README's Limitations.
+
     Returns:
         ``(B, H, T/p, d)`` -- this rank's rows of the full attention output.
     """
