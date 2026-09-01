@@ -63,3 +63,27 @@ jobs:
         # half, are drawn only from the JSON committed under results/. If this
         # step fails, a figure is reading something that is not in the repository.
         run: python scripts/make_figures.py --assets /tmp/assets_ci
+
+      - name: The CUDA decisions, resolved against a fabricated 8-GPU node
+        # No CUDA on this runner and none needed. Every backend, placement and
+        # mixed-precision decision the GPU run would make is a pure function of
+        # a Capabilities snapshot, so a stubbed one exercises all of them. This
+        # is the step that keeps the CUDA path from rotting between GPU runs.
+        run: |
+          python scripts/gpu_preflight.py --dry-run --stub-gpus 8 --stub-capability 8.0
+          python scripts/gpu_preflight.py --dry-run --stub-gpus 8 --stub-capability 9.0
+          # Pre-Ampere must refuse bf16, and two GPUs must refuse eight ranks.
+          ! python scripts/gpu_preflight.py --dry-run --stub-gpus 2 --world-sizes 8
+
+      - name: The GPU runner script, end to end at tiny sizes
+        # Proves the one-command entry point still works: stage ordering, the
+        # resume markers, the per-stage logs and the results diff. The heavy
+        # stages are left out because the step above already ran the tests and
+        # this runner has no GPU to make them interesting.
+        run: |
+          ./scripts/run_on_gpu.sh --smoke --infra-only --skip-install --skip-tests \
+            --stages preflight,parallel,collectives,figures,summary
+          # And it must be idempotent: a second invocation skips everything.
+          ./scripts/run_on_gpu.sh --smoke --infra-only --skip-install --skip-tests \
+            --stages preflight,parallel,collectives,figures,summary | tee /tmp/second.log
+          grep -q "skip   parallel" /tmp/second.log

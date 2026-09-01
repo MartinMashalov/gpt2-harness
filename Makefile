@@ -2,7 +2,7 @@ PY ?= .venv/bin/python
 export PYTHONPATH := src
 export PYTORCH_ENABLE_MPS_FALLBACK := 1
 
-.PHONY: help install test test-fast lint fmt verify ablate induction kv quantize prune distill pareto parallel roofline diagnose cluster figures all clean
+.PHONY: help install test test-fast lint fmt verify ablate induction kv quantize prune distill pareto parallel roofline diagnose cluster collectives preflight dry-run smoke gpu compare figures all clean
 
 help:
 	@grep -E '^[a-z-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  \033[1m%-12s\033[0m %s\n", $$1, $$2}'
@@ -59,6 +59,24 @@ diagnose:  ## PART 2 -- inject four throughput pathologies and show the tool fin
 
 cluster:  ## PART 3 -- reshard a checkpoint, kill a rank, restart, fit the collective model (28 s measured, CPU)
 	$(PY) scripts/run_cluster.py
+
+collectives:  ## PART 3 -- all-reduce, all-gather and reduce-scatter across sizes and world sizes
+	$(PY) scripts/run_collectives.py --world-sizes 2,4
+
+preflight:  ## GPU -- what is this machine, and can it run the sweep
+	$(PY) scripts/gpu_preflight.py --world-sizes 2,4,8
+
+dry-run:  ## GPU -- resolve every CUDA decision against a fabricated 8-GPU node, no CUDA touched
+	$(PY) scripts/gpu_preflight.py --dry-run --stub-gpus 8
+
+smoke:  ## GPU -- the whole infrastructure pipeline at tiny sizes (5m29s measured, CPU)
+	./scripts/run_on_gpu.sh --smoke --infra-only --skip-install
+
+gpu:  ## GPU -- the full sweep on a rented box. See docs/GPU_RUN.md first.
+	./scripts/run_on_gpu.sh
+
+compare:  ## GPU -- diff results/ against the committed baseline
+	$(PY) scripts/compare_results.py --baseline-git HEAD
 
 figures:  ## redraw every figure from the committed results
 	$(PY) scripts/make_figures.py
