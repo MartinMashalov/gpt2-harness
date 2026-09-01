@@ -79,7 +79,7 @@ spec:
             claimName: training-corpus
       containers:
         - name: trainer
-          image: ghcr.io/example/transformer-internals:latest
+          image: ghcr.io/example/gpt2-harness:latest
           command: ["torchrun"]
           args:
             - --nnodes=8

@@ -67,7 +67,7 @@ spec:
             claimName: training-corpus
       containers:
         - name: trainer
-          image: ghcr.io/example/transformer-internals:latest
+          image: ghcr.io/example/gpt2-harness:latest
           command: ["/bin/bash", "-lc"]
           args:
             - |

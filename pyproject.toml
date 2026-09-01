@@ -3,7 +3,7 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "transformer-internals"
+name = "gpt2-harness"
 version = "0.1.0"
 description = "GPT-2 rebuilt from the paper, verified against the reference implementation, then taken apart to measure what every part of it is worth."
 readme = "README.md"
@@ -46,7 +46,7 @@ verify = ["transformers>=4.40,<5", "huggingface_hub>=0.20", "safetensors>=0.4"]
 dev = ["pytest>=7.4", "ruff>=0.4"]
 
 [project.urls]
-Homepage = "https://github.com/MartinMashalov/transformer-internals"
+Homepage = "https://github.com/MartinMashalov/gpt2-harness"
 
 [tool.setuptools.packages.find]
 where = ["src"]
