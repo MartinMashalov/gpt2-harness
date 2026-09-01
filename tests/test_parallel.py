@@ -240,20 +240,67 @@ def test_a_bf16_gradient_reduction_costs_accuracy_and_the_cost_is_bounded():
 
 
 @pytest.mark.parametrize("stage", [1, 2])
-def test_the_fp32_master_shard_stops_the_bf16_error_compounding(stage: int):
-    """The point of holding a master copy, stated as a measurement.
+def test_a_bf16_reduction_injects_a_fresh_error_each_step_and_none_accumulates(
+    stage: int,
+):
+    """The bf16 gradient reduction perturbs the trajectory without compounding.
 
-    With the optimiser updating an fp32 master shard, a bf16 gradient reduction
-    injects a fresh rounding error every step and none of it accumulates in the
-    optimiser state. So the trajectory error should be flat across steps rather
-    than growing. The assertion is that step 4's error is no more than 1.5x step
-    1's; a run whose master state had been allowed to fall to bf16 would grow far
-    faster than that.
+    The optimiser's state is fp32 on this path and the collective is the only
+    narrow thing, so each step gets a new rounding error and none of it is
+    carried in the moments. The trajectory error should therefore be flat across
+    steps rather than growing. The assertion is that step 4's error is no more
+    than 1.5x step 1's; a run that let the rounding into its optimiser state
+    would grow far faster than that.
+
+    This path holds no separate master shard, and does not need one: with an
+    fp32 parameter all-gather the replicated parameters *are* the master copy.
+    The path that does need one is below.
     """
     r = run(zero_equivalence_worker, 2, stage=stage, steps=4, reduce_dtype="bf16")[0].value
     errors = r["param_errors"]
     assert errors[0] > 1e-05, "the bf16 reduction did not perturb anything"
     assert errors[-1] <= 1.5 * errors[0], errors
+    # No narrow parameter gather, so no second copy of anything.
+    assert r["sharded_bytes"]["master_shard"] == 0
+
+
+def test_a_bf16_parameter_gather_allocates_the_fp32_master_shard():
+    """The copy exists exactly when it is needed, and not otherwise.
+
+    With an fp32 all-gather the replicated parameters are lossless and are
+    already the master, so a second copy would be 4N/p bytes per rank of
+    duplication. With a bf16 all-gather they are not, and re-deriving the shard
+    from them each step would feed the gather's rounding back into the optimiser.
+    """
+    without = run(zero_equivalence_worker, 2, stage=2, steps=4)[0].value
+    with_bf16 = run(zero_equivalence_worker, 2, stage=2, steps=4, param_dtype="bf16")[0].value
+
+    assert without["sharded_bytes"]["master_shard"] == 0
+    assert with_bf16["sharded_bytes"]["master_shard"] > 0
+    # One fp32 copy of this rank's shard of the flat parameter vector.
+    assert with_bf16["sharded_bytes"]["master_shard"] == with_bf16["shard_numel"] * 4
+
+
+def test_the_bf16_parameter_gather_error_saturates_at_bf16s_own_resolution():
+    """It grows for a few steps and then stops, and the ceiling is checkable.
+
+    bf16's grid spacing at 1.0 is 2^-7, so its worst rounding error there is
+    2^-8 = 3.906e-03. The largest parameter in the tested model is a LayerNorm
+    gain sitting at 1.0, which is what caps this column. Over eight steps the
+    error goes 1.00, 2.00, 3.00, 3.91, 3.82, 3.91, 3.89, 3.89 e-03: it reaches
+    the ceiling and stays there rather than compounding, which is the fp32
+    master shard doing its job on a path where the parameters themselves are
+    rounded every step.
+    """
+    r = run(zero_equivalence_worker, 2, stage=2, steps=8, param_dtype="bf16")[0].value
+    errors = r["param_errors"]
+    ceiling = 2.0**-8
+    assert max(errors) < ceiling * 1.05, errors
+    # It really does grow first, so the plateau is a plateau and not a constant.
+    assert errors[0] < 0.5 * max(errors)
+    # And the last four steps are flat, not still climbing.
+    tail = errors[4:]
+    assert max(tail) - min(tail) < 0.1 * max(tail), tail
 
 
 # --------------------------------------------------------------------------- #
