@@ -1283,9 +1283,9 @@ per rank per step, and ZeRO-2 keeps a quarter of the memory. Nothing in a
 tutorial made that obvious; counting the bytes did.
 
 **The two schedules with the same bubble differ only in memory.** GPipe and 1F1B
-measured 0.293 and 0.300 idle at 8 micro-batches, and produce gradients that
-agree to 3.0e-08. The entire argument for 1F1B is the activation stash, which
-stops growing at `p` while GPipe's grows with `m`.
+measured 0.306 and 0.307 at 8 micro-batches, fastest of three repeats, and
+produce gradients that agree to 3.0e-08. The entire argument for 1F1B is the
+activation stash, which stops growing at `p` while GPipe's grows with `m`.
 
 ---
 
