@@ -250,6 +250,51 @@ number from the same datasheets is the ridge point: **153 FLOP/byte on the A100
 and 295 on the H100, against 21 here**, so every memory-bound operator in the
 table above sits further below the roof on that hardware, not closer to it.
 
+### The two attention GEMMs change sides on a GPU, and that is why FlashAttention exists
+
+This falls out of the table above with no new measurement, only arithmetic.
+
+`QK^T` and `attention x V` sit at **25.6 FLOP/byte**, which is above this
+machine's measured ridge of 21.07, so on an M1 Max they are compute-bound, by a
+factor of 1.21. Against the ridge points computed from the published A100 and
+H100 datasheets they are not: 25.6 is **6.0x below the A100's 153** and **11.5x
+below the H100's 295**. The two operators that are compute-bound here are
+memory-bound there. Every other GEMM in the block stays compute-bound on all
+three, because the parameterised GEMMs sit at 175 to 267 FLOP/byte.
+
+Switching to bf16 does not rescue them. Halving the element size halves the
+traffic and doubles the intensity to 51.2, still 3.0x below the A100 ridge.
+
+Nor does a longer context, and this is the part worth writing out. For a head of
+width `d` at element size `e`, the unfused score matmul does `2 B H T^2 d` FLOPs
+and moves `e (2 B H T d + B H T^2)` bytes, so its intensity is
+
+    I(T) = 2 T d / (e (2 d + T))     ->     2 d / e     as T grows
+
+At `d = 64` that ceiling is **32 FLOP/byte in fp32 and 64 in bf16**, and it is a
+ceiling: no context length reaches it, and the A100's ridge is 2.4x above it
+even in bf16. An unfused attention that materialises its `T x T` score matrix in
+HBM **cannot be compute-bound on that hardware at any shape**. The quadratic
+term is in the numerator and the denominator at once, so growing `T` does not
+help.
+
+Put the bf16 intensity at this shape back through the roofline and it says how
+much of the machine those two operators can reach at best. On an H100 the bound
+is
+`51.2 x 3350 GB/s = 172 TFLOP/s`, which is **17% of the 989 TFLOP/s dense
+peak**; on an A100, **33%**. On this machine the bound is 7.9 TFLOP/s against a
+6.5 TFLOP/s compute roof, so it is not the binding constraint at all and the
+same two operators are capped at 100%.
+
+That is the whole argument for fusing attention. Keeping the score tile in SRAM
+so it never crosses HBM removes the `B H T^2` term from the denominator, the
+intensity stops being bounded by `2d/e`, and the ceiling those two operators are
+stuck under goes away. It is also why the argument is invisible on the hardware
+this repository was written on: here there is no ceiling to remove. All of the
+GPU figures in this section are computed from published datasheet peaks and are
+**modelled, not measured**. This repository does not implement a fused kernel
+(see Limitations); it contains the arithmetic that says where one would pay.
+
 ### Profile of one real step
 
 CPU, batch 2 x sequence 256, one recorded step, self time so the shares
