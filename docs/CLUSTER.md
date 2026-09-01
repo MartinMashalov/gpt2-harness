@@ -9,13 +9,13 @@ and a cost model that says which axis of parallelism belongs inside a node.
 There is no GPU cluster behind this document. Pretending otherwise would be the
 easiest thing to catch, so every number below is labelled:
 
-* **MEASURED** — produced by running the code in this repository on the machine
+* **MEASURED**: produced by running the code in this repository on the machine
   it was written on: an Apple M1 Max, 10 cores, 32 GiB, macOS 15.6.1, PyTorch
   2.2.2, CPU only, `torch.distributed` on the gloo backend with one OS process
   per rank. Every measured number below is read from
   [`results/cluster.json`](../results/cluster.json), which `make cluster`
   (`scripts/run_cluster.py`) writes in one 28-second run.
-* **MODELLED** — computed from published interconnect bandwidths by
+* **MODELLED**: computed from published interconnect bandwidths by
   `src/transformer_internals/cluster/fabric.py`, which prints its sources.
   Nothing here was measured on an H100.
 
@@ -46,14 +46,14 @@ GPT-2's `c_attn` weight is one `(3C, C)` matrix holding query, key and value
 projections stacked along dim 0. Tensor parallelism splits it column-wise into
 per-head groups, so rank *r* must own head-group *r* of Q **and** of K **and** of
 V. Splitting the `(3C, C)` matrix into `world_size` contiguous blocks does not do
-that. With 3 ranks, rank 0 would get all of Q and none of K or V — and the model
+that. With 3 ranks, rank 0 would get all of Q and none of K or V, and the model
 would still load, still run, and be silently wrong. `ShardSpec.sections = 3` is
 what makes the split per-section.
 
 `tests/test_cluster.py::test_fused_qkv_split_keeps_whole_heads_of_each_projection`
 tags every row of the matrix with which projection and which head it belongs to,
 then asserts that each rank's slice contains only whole heads of each of the
-three projections — and that the naive plan does not.
+three projections, and that the naive plan does not.
 
 Two more tests assert the plan is a *valid tensor-parallel* plan rather than
 merely reversible: the column-parallel shards concatenate to the full matmul
@@ -61,7 +61,7 @@ output exactly, and the row-parallel shards' partial sums add to it.
 
 ### What the resharding actually delivers
 
-`make cluster` — **MEASURED**, `results/cluster.json` → `resharding`:
+`make cluster`: **MEASURED**, `results/cluster.json` → `resharding`:
 
 ```
 GPT-2 124M: 124,439,808 parameters in 149 tensors, fp32
@@ -81,7 +81,7 @@ anything, so any difference at all is a bug. The test matrix covers 4→2, 4→1
 2→8, 4→8, 8→4 and 1→4 and asserts exact logit equality in every direction.
 
 **Reads only what it needs.** Going 4→8 splits each source shard in two, so a
-destination rank opens exactly one file — asserted, not claimed. Going 4→2 opens
+destination rank opens exactly one file: asserted, not claimed. Going 4→2 opens
 two. Restoring the full model into one process opens all four. Replicated
 tensors are read from the source shard the rank is already opening rather than
 always from shard 0, so a 512-rank restore does not turn into 512 ranks
@@ -117,7 +117,7 @@ not divisible by 4, so a vocabulary-parallel embedding cannot be split 4 ways.
 `split_tensor` refuses rather than padding behind your back. This is exactly why
 Megatron-LM has `--make-vocab-size-divisible-by 128`: the vocabulary is padded
 with unreachable rows at construction time so it divides by any tensor-parallel
-degree the run might later use. The alternative — replicating the embedding — is
+degree the run might later use. The alternative, replicating the embedding, is
 supported with `gpt2_tp_plan(state, vocab_parallel=False)`.
 
 ---
@@ -128,8 +128,8 @@ supported with `gpt2_tp_plan(state, vocab_parallel=False)`.
 (`python -m transformer_internals.cluster.failure`, with `RANK`, `WORLD_SIZE`,
 `MASTER_ADDR` and `MASTER_PORT` in the environment, which is the same contract
 `torchrun` has with its workers), gloo, `DistributedDataParallel`, checkpoints
-every 5 steps. The launcher then sends a real `SIGKILL` to rank 1 — no
-unwinding, no teardown, no chance to flush — waits for the survivors to be torn
+every 5 steps. The launcher then sends a real `SIGKILL` to rank 1: no
+unwinding, no teardown, no chance to flush: waits for the survivors to be torn
 down, and relaunches from the last checkpoint.
 
 The assertion is not "the loss still goes down". The same job is run twice, once
@@ -147,14 +147,14 @@ max |loss(resumed) - loss(uninterrupted)| over steps 11-20 = 0.000e+00
 Zero, not "small". Same weights, same optimiser moments, same data in the same
 order gives the same float. Three things have to be in the checkpoint for that
 to hold and all three are: parameters, optimiser state (Adam's two moments and
-its step count — restoring weights but not moments restarts the bias correction
+its step count: restoring weights but not moments restarts the bias correction
 and puts a visible bump in the loss for a few hundred steps), and the dataloader
 position for every rank.
 
 Time-to-recover here is 2.20 s, and almost all of it is process startup and
 importing torch. On a real job that interval also contains the scheduler
 noticing, requeueing, allocating replacement nodes, and re-reading a checkpoint
-of hundreds of gigabytes over the storage fabric — minutes, not seconds. The
+of hundreds of gigabytes over the storage fabric: minutes, not seconds. The
 structure of the measurement is the same: the clock starts when the rank dies
 and stops when the first optimiser step lands after the restart.
 
@@ -167,7 +167,7 @@ machine to be worth anything. What it means in practice:
 on each node. The agent owns the local ranks; when one dies, the agent kills the
 rest of its local ranks, re-enters the rendezvous, and the whole group restarts
 from the last checkpoint. With `--nnodes=6:8` the rendezvous accepts a range,
-and the job continues on whatever nodes are present — which is only usable if
+and the job continues on whatever nodes are present, which is only usable if
 the world size is not baked into the data plan. That is the reason the streaming
 dataloader below reshards across a change of world size: with a fixed
 `i % world_size` assignment, coming back on 6 nodes instead of 8 silently
@@ -192,14 +192,14 @@ every launcher in `deploy/`.
 `cluster/streaming.py`. Three properties, all asserted:
 
 **Disjoint shards covering the epoch exactly once.** One global order for the
-epoch — a permutation seeded from `(seed, epoch)`, so every rank computes it
+epoch, a permutation seeded from `(seed, epoch)`, so every rank computes it
 without communicating. Rank *r* of *W* takes positions `r, r+W, r+2W, ...`. A
 strided deal rather than contiguous blocks, deliberately: contiguous blocks give
 each rank one long region of the corpus, so a rank that draws a region of short
 documents runs ahead and every step is set by the slowest rank for the whole
 epoch.
 
-**The position is part of the checkpoint.** Not the epoch number — the position
+**The position is part of the checkpoint.** Not the epoch number, the position
 *within* the epoch, per rank. Resuming at the top of the epoch is the most
 common data bug in a restartable trainer and it is invisible: nothing errors,
 the loss curve looks normal, and the model quietly sees a fraction of the corpus
@@ -208,8 +208,8 @@ many times and the rest never.
 **Resuming is replanning, not seeking.** Given every rank's position, the set of
 already-consumed order positions is known exactly, so the remainder of the epoch
 is dealt out again over however many ranks now exist. When the world size has
-not changed and all ranks stopped at the same step — the normal case, because
-ranks checkpoint together at a barrier — replanning reproduces the original
+not changed and all ranks stopped at the same step, the normal case, because
+ranks checkpoint together at a barrier: replanning reproduces the original
 assignment exactly. That is what makes section 2's loss trajectory match. When
 the world size *has* changed, coverage is still exactly once, which is what
 makes elastic restart safe.
@@ -235,7 +235,7 @@ two, 256-token samples, best of three:
 Against a memory-mapped file already in the page cache, a read is a memcpy and
 the reader thread is pure overhead: prefetch makes it **2x to 4.6x slower**.
 Against storage that takes 500 µs a read, with a consumer that takes 500 µs a
-sample, prefetch 8 is **1.92x** faster than no prefetch — against a ceiling of
+sample, prefetch 8 is **1.92x** faster than no prefetch: against a ceiling of
 exactly 2.00x, because when the read and the step cost the same, perfect overlap
 halves the total.
 
@@ -258,7 +258,7 @@ Ring collectives, `time = latency + bytes / bandwidth`:
 * all-gather / reduce-scatter: `(N-1)/N · S/B + (N-1)·lat`
 * point-to-point: `S/B + lat`
 
-Published bandwidths used (peak, unidirectional, per GPU — NVIDIA quotes NVLink
+Published bandwidths used (peak, unidirectional, per GPU. NVIDIA quotes NVLink
 as 900 GB/s *bidirectional aggregate*, which is 450 GB/s each way, and each way
 is what a ring gets):
 
@@ -294,7 +294,7 @@ Read the `tp` row across. Tensor parallelism moves 2560 all-reduces of 134 MB
 per step, because it communicates *per layer, per microbatch, in both
 directions*, and the volume scales with tokens rather than with parameters. On
 NVLink that is 0.19x the compute time and hides under it. On InfiniBand NDR it
-is 1.67x the compute time — the GPUs would spend most of the step idle. On RoCE
+is 1.67x the compute time, the GPUs would spend most of the step idle. On RoCE
 it is 3.3x.
 
 Sharded data parallelism moves three passes over the parameters this rank holds,
@@ -303,8 +303,8 @@ compute, and it overlaps with the backward pass.
 
 The ratio is what matters: on the same fabric, TP costs **13.8x** what FSDP
 costs per step. That number, not tradition, is what pins tensor parallelism
-inside the node. Pipeline parallelism is smaller still — point-to-point
-activations at stage boundaries only — and the test asserts it is under 1% of
+inside the node. Pipeline parallelism is smaller still: point-to-point
+activations at stage boundaries only, and the test asserts it is under 1% of
 the TP traffic, which is why the stage boundaries are the right place to put a
 node boundary.
 
@@ -316,8 +316,8 @@ TP becomes communication-bound on ib_ndr   at tp=8
 TP becomes communication-bound on roce200  at tp=4
 ```
 
-So the standard layout — TP inside the 8-GPU NVLink domain, FSDP or pipeline
-across the InfiniBand fabric — is not a convention. It is where these two curves
+So the standard layout. TP inside the 8-GPU NVLink domain, FSDP or pipeline
+across the InfiniBand fabric: is not a convention. It is where these two curves
 cross.
 
 ### GPUDirect RDMA, and what it removes
@@ -331,7 +331,7 @@ floor becomes a kernel round-trip rather than a wire round-trip.
 GPUDirect RDMA lets the NIC DMA straight into and out of the GPU's BAR-mapped
 memory. The payload crosses PCIe once per side, never touches host memory, and
 the CPU only posts the work request. That is why it matters most for small and
-medium messages — the fixed cost is what it removes — and why the NIC has to sit
+medium messages, the fixed cost is what it removes, and why the NIC has to sit
 under the same PCIe switch as the GPU, which is what `NCCL_NET_GDR_LEVEL=2`
 means. **MODELLED** effect of turning it off, as a 1.6x bandwidth penalty and
 +5 µs:
@@ -342,7 +342,7 @@ tp over ib_ndr: 14219.8 ms -> 22887.9 ms (1.61x)
 
 Two operational notes that are not in the model. RDMA has to pin the memory it
 registers with the NIC, so a container without `CAP_IPC_LOCK` fails
-registration and NCCL falls back to TCP — the job runs, at a fraction of the
+registration and NCCL falls back to TCP, the job runs, at a fraction of the
 speed, with nothing in the logs but a line in `NCCL_DEBUG=INFO` output saying
 `via NET/Socket` instead of `via NET/IB`. And on RoCE the same verbs run over
 Ethernet, which needs PFC/ECN configured to be lossless; without it the fabric
@@ -367,8 +367,8 @@ them**, and R² is the claim. The affine form describes a real collective. The
 2-4 GB/s is loopback TCP plus a memory copy, not a fabric, and means nothing
 beyond this machine.
 
-Below about 64 KiB the fit degrades badly — R² of 0.84 over 16 KiB–4 MiB in one
-run — which is the model's own point: small messages are latency, not bandwidth,
+Below about 64 KiB the fit degrades badly. R² of 0.84 over 16 KiB–4 MiB in one
+run, which is the model's own point: small messages are latency, not bandwidth,
 and that is the regime where GPUDirect and the number of hops decide everything.
 
 The full sweep is three collectives across message sizes and world sizes, in
@@ -389,8 +389,8 @@ datasheet NVLink entry. See `docs/GPU_RUN.md`.
 
 ## 5. cgroups
 
-Every scheduler that runs training jobs — Slurm's cgroup plugin, Kubernetes,
-Docker, Ray under either — enforces its limits through cgroups, and nothing the
+Every scheduler that runs training jobs. Slurm's cgroup plugin, Kubernetes,
+Docker, Ray under either: enforces its limits through cgroups, and nothing the
 process can see with `free` or `nproc` reflects them. Inside a container those
 still report the host's memory and CPU count, so a dataloader sizing its worker
 pool from `os.cpu_count()` is wrong by an order of magnitude and gets throttled
@@ -426,17 +426,17 @@ is the first thing to read after an unexplained rank death.
 
 The three walls behave differently, and only one of them kills:
 
-* `memory.max` — hard. OOM kill, signal 9, no Python-level anything.
-* `memory.high` — soft. No kill; the cgroup is throttled into reclaim and the
+* `memory.max`: hard. OOM kill, signal 9, no Python-level anything.
+* `memory.high`: soft. No kill; the cgroup is throttled into reclaim and the
   step time inflates. A throughput bug, not a crash, and "the run is at 30% of
   expected throughput" is exactly what it looks like from outside.
-* `cpu.max` — a quota. Also no kill: the cgroup is throttled at the end of each
+* `cpu.max`, a quota. Also no kill: the cgroup is throttled at the end of each
   period, and `cpu.stat`'s `nr_throttled` and `throttled_usec` are the proof. A
   dataloader given 2 CPUs that spawns 32 workers spends its life throttled, and
   the GPU waits.
 
 **Swap changes the failure mode and is usually the wrong trade.** With swap
-allowed, a rank survives an overshoot by paging — at disk latency, mid-step,
+allowed, a rank survives an overshoot by paging: at disk latency, mid-step,
 while every other rank waits for it at the next collective. One rank swapping
 stalls the whole job, and it presents as a hang rather than as a slow rank. A
 fast death is cheaper to diagnose. Most GPU clusters run training cgroups with
@@ -456,7 +456,7 @@ In `deploy/`, with the reasoning inline. Four schedulers, one job.
 **Slurm** (`slurm_train.sbatch`). One task per GPU, `--gpus-per-task=1`,
 `--cpus-per-task` sized to the node, `--gres-flags=enforce-binding` so the CPU
 cgroup follows the GPU's NUMA node. `srun` starts one `torchrun` per node and
-`torchrun` owns the ranks under it — two layers, because a transient rank
+`torchrun` owns the ranks under it: two layers, because a transient rank
 failure is `torchrun`'s job and a dead node is Slurm's. `--requeue` plus
 `--signal=B:USR1@180` gives the job three minutes to checkpoint before the wall
 clock expires and hand itself back to the scheduler. `--open-mode=append` so a
@@ -467,7 +467,7 @@ running at a twentieth of the expected all-reduce bandwidth.
 
 **Ray** (`ray_train.py`). `TorchTrainer` with `FailureConfig(max_failures=3)`,
 which is Ray's equivalent of `--max-restarts`, and checkpoints reported through
-`ray.train.report` so the driver — which outlives the workers — still holds them
+`ray.train.report` so the driver, which outlives the workers, still holds them
 after every worker has died. The line that matters is
 `placement_strategy="STRICT_PACK"`: Ray schedules by resource request and has no
 idea what NVLink is, so if you want a tensor-parallel group on one machine you
@@ -482,7 +482,7 @@ and nowhere else. `/dev/shm` defaults to 64 MB in a container, which kills
 DataLoader workers and NCCL's shared-memory transport with a bus error minutes
 into the run; it is sized explicitly with a memory-backed `emptyDir`. And
 Kubernetes spreads pods across failure domains by default, which is right for a
-service and wrong for a training job — the affinity rules pin every pod into one
+service and wrong for a training job, the affinity rules pin every pod into one
 network topology block and one pod per node. Requests equal limits so the pod is
 Guaranteed QoS and not evictable, `rdma/hca_shared_devices_a` requests the RDMA
 device, and `CAP_IPC_LOCK` lets RDMA pin its memory regions. The StatefulSet
@@ -490,7 +490,7 @@ variant exists for the case where each rank writes its own checkpoint shard to
 its own volume: a rescheduled Job pod gets a new name and cannot find the shard
 its predecessor wrote, while `gpt-train-3` always comes back as `gpt-train-3`.
 
-**Dask** (`dask_note.md`). Not in the training loop — a dynamic work-stealing
+**Dask** (`dask_note.md`). Not in the training loop, a dynamic work-stealing
 scheduler is the opposite of what a synchronous collective needs. It belongs in
 corpus preparation: tokenisation, MinHash deduplication as a groupby on band
 hashes, the global shuffle that stops each rank seeing a source-correlated
