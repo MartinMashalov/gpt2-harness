@@ -42,6 +42,7 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _common import RESULTS, write_json
+from transformer_internals import hardware
 from transformer_internals.cluster.checkpoint import (
     AsyncCheckpointer,
     gpt2_tp_plan,
@@ -417,6 +418,7 @@ def main() -> int:
     payload["meta"] = {
         "backend": "gloo",
         "device": "cpu",
+        "environment": hardware.environment_payload(),
         "torch": torch.__version__,
         "python": platform.python_version(),
         "platform": platform.platform(),

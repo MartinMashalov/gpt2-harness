@@ -33,7 +33,7 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _common import ASSETS, RESULTS, write_json
-from transformer_internals import viz
+from transformer_internals import hardware, viz
 from transformer_internals.parallel.common import parallel_config
 from transformer_internals.parallel.comms import spawn_workers
 from transformer_internals.parallel.data_parallel import ddp_equivalence_worker
@@ -107,9 +107,10 @@ def main() -> int:
     cfg = parallel_config()
     n_embd, seq, batch = cfg.n_embd, args.seq, args.batch
     started = time.time()
+    caps = hardware.Capabilities.detect()
     print(
-        f"gloo on CPU | equivalence world size {p} | pipeline stages "
-        f"{args.pipeline_stages} | torch {torch.__version__}"
+        f"{hardware.select_backend(caps)} on {caps.accelerator} | equivalence world "
+        f"size {p} | pipeline stages {args.pipeline_stages} | torch {torch.__version__}"
     )
 
     equivalence: dict[str, Any] = {}
@@ -657,8 +658,9 @@ def main() -> int:
         "pipeline": pipeline,
         "projection_gpt2_124m": projection,
         "meta": {
-            "backend": "gloo",
-            "device": "cpu",
+            "backend": ddp[0].backend,
+            "device": ddp[0].device,
+            "environment": hardware.environment_payload(),
             "torch": torch.__version__,
             "python": platform.python_version(),
             "platform": platform.platform(),

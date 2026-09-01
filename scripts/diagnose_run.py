@@ -174,10 +174,19 @@ def main() -> int:
     ap.add_argument("--skip-distributed", action="store_true")
     ap.add_argument("--reuse-peak", action="store_true", help="read results/roofline.json")
     ap.add_argument("--out", default=str(RESULTS / "diagnosis.json"))
+    ap.add_argument(
+        "--assets",
+        default=str(ASSETS),
+        help="where the figure goes; a smoke run should not overwrite the real one",
+    )
     args = ap.parse_args()
 
     device = device_from_arg(args.device)
-    peak = load_peak(RESULTS / "roofline.json", str(device)) if args.reuse_peak else None
+    # Siblings of --out rather than hardcoded under results/, so a smoke run
+    # writing elsewhere cannot overwrite the committed measurements.
+    out_dir = Path(args.out).parent
+    assets = Path(args.assets)
+    peak = load_peak(out_dir / "roofline.json", str(device)) if args.reuse_peak else None
     if peak is None:
         print(f"measuring machine peaks on {device}")
         peak = measure_machine_peak(device)
@@ -244,7 +253,7 @@ def main() -> int:
             seq=64,
             port=args.port,
         )
-        write_json(RESULTS / "collectives.json", collectives)
+        write_json(out_dir / "collectives.json", collectives)
         print(
             f"  {collectives['grad_bytes'] / 1e6:.1f} MB of gradients across "
             f"{collectives['n_grad_tensors']} tensors, {collectives['backend']} over "
@@ -337,9 +346,10 @@ def main() -> int:
         "all_passed": bool(all_ok),
     }
     write_json(args.out, payload)
-    fig = fig_step_breakdown(payload["reports"], ASSETS / "step_breakdown.png")
+    assets.mkdir(parents=True, exist_ok=True)
+    fig = fig_step_breakdown(payload["reports"], assets / "step_breakdown.png")
     print(f"\nwrote {fig}")
-    fig_step_breakdown(payload["reports"], ASSETS / "step_breakdown_web.png", web=True)
+    fig_step_breakdown(payload["reports"], assets / "step_breakdown_web.png", web=True)
     return 0 if all_ok else 1
 
 

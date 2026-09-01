@@ -27,6 +27,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _common import ASSETS, RESULTS, device_from_arg, write_json
+from transformer_internals import hardware
 from transformer_internals.config import GPTConfig
 from transformer_internals.perf.mfu import flops_6nd, measure_step_mfu
 from transformer_internals.perf.plots import fig_roofline
@@ -49,15 +50,43 @@ def main() -> int:
     ap.add_argument("--profile-batch", type=int, default=2)
     ap.add_argument("--profile-seq", type=int, default=256)
     ap.add_argument("--skip-profile", action="store_true")
+    ap.add_argument(
+        "--gemm-sizes",
+        type=int,
+        nargs="+",
+        default=[256, 512, 1024, 2048, 3072, 4096],
+        help="square GEMM dimensions for the peak-compute sweep",
+    )
+    ap.add_argument(
+        "--stream-sizes-mib",
+        type=int,
+        nargs="+",
+        default=[16, 64, 256, 512],
+        help="array sizes for the STREAM triad, in MiB each",
+    )
     ap.add_argument("--out", default=str(RESULTS / "roofline.json"))
+    ap.add_argument(
+        "--assets",
+        default=str(ASSETS),
+        help="where the roofline figure goes; a smoke run should not overwrite the real one",
+    )
     args = ap.parse_args()
 
     device = device_from_arg(args.device)
     cfg = GPTConfig()
+    # mfu.json, profile.json and the trace are siblings of --out rather than
+    # hardcoded under results/. A smoke run writing to /tmp must not overwrite
+    # the committed measurements, and before this they did.
+    out_dir = Path(args.out).parent
+    assets = Path(args.assets)
 
     # ---- 1. measured peaks
     print(f"measuring peaks on {device} (GEMM sweep, then STREAM triad)")
-    peak = measure_machine_peak(device)
+    peak = measure_machine_peak(
+        device,
+        gemm_sizes=tuple(args.gemm_sizes),
+        stream_sizes_mib=tuple(args.stream_sizes_mib),
+    )
     print(
         f"  peak compute   {peak.peak_flops_per_s / 1e12:9.3f} TFLOP/s  fp32, best of the sweep\n"
         f"  peak bandwidth {peak.peak_bytes_per_s / 1e9:9.1f} GB/s     triad, best of the sweep\n"
@@ -128,7 +157,7 @@ def main() -> int:
     # ---- 4. profile a real step
     profile = None
     if not args.skip_profile:
-        trace = RESULTS / "trace_training_step.json.gz"
+        trace = out_dir / "trace_training_step.json.gz"
         print(f"\nprofiling a training step on cpu, trace -> {trace}")
         profile = profile_training_step(
             GPTConfig(n_positions=max(args.profile_seq, 1024)),
@@ -147,14 +176,18 @@ def main() -> int:
 
     payload["mfu"] = mfu.to_dict()
     payload["mfu"]["flops_6nd_total"] = six_nd
+    # Which machine produced these numbers. A roofline is a property of the
+    # hardware, so a roofline file without the hardware in it is unreadable.
+    payload["environment"] = hardware.environment_payload()
     write_json(args.out, payload)
-    write_json(RESULTS / "mfu.json", mfu.to_dict())
+    write_json(out_dir / "mfu.json", mfu.to_dict())
     if profile is not None:
-        write_json(RESULTS / "profile.json", profile.to_dict())
+        write_json(out_dir / "profile.json", profile.to_dict())
 
-    fig = fig_roofline(payload, ASSETS / "roofline.png")
+    assets.mkdir(parents=True, exist_ok=True)
+    fig = fig_roofline(payload, assets / "roofline.png")
     print(f"wrote {fig}")
-    fig_web = fig_roofline(payload, ASSETS / "roofline_web.png", web=True)
+    fig_web = fig_roofline(payload, assets / "roofline_web.png", web=True)
     print(f"wrote {fig_web}")
     return 0
 
