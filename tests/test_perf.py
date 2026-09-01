@@ -26,6 +26,7 @@ import pytest
 import torch
 
 import transformer_internals.perf.diagnose as diag
+from transformer_internals.cluster.failure import free_port
 from transformer_internals.config import GPTConfig
 from transformer_internals.model import GPT
 from transformer_internals.perf.diagnose import (
@@ -326,18 +327,30 @@ def test_matmul_dominates_a_transformer_step_on_cpu() -> None:
 
     The shape matters and used to be too small. At 128 wide, batch 4, sequence
     64, the GEMMs are small enough that operator dispatch is a large share of
-    the step and matmul came in at 0.36 of self time on an idle machine and
-    0.28 on a loaded one, which failed. At 256 wide, batch 8, sequence 128 it is
-    0.63, and the profile is faster to collect (0.8 s against 1.7 s) because
-    there is less dispatch to record. The threshold below is unchanged; what
-    changed is that the shape is now representative of what the committed
-    profile measures rather than of Python's overhead.
+    the step: matmul came in at 0.36 of self time on an idle machine and 0.28 on
+    a loaded one, and the test failed. Widening it is what fixes that, and the
+    threshold below is unchanged.
+
+    Five profiles at each of two widths, to pick one rather than guess:
+
+        256 wide   1.0 s   matmul 0.517 to 0.706   ratio to next 2.01 to 5.52
+        512 wide   1.5 s   matmul 0.648 to 0.695   ratio to next 3.36 to 5.11
+
+    512, because the spread is a quarter as wide for half a second more. Both
+    assertions have real margin there, and the second one is the claim: matmul
+    does not merely lead, it dominates.
     """
-    cfg = GPTConfig(vocab_size=256, n_positions=128, n_layer=2, n_head=4, n_embd=256, dropout=0.0)
+    cfg = GPTConfig(vocab_size=256, n_positions=128, n_layer=2, n_head=8, n_embd=512, dropout=0.0)
     report = profile_training_step(cfg, batch=8, seq=128, device="cpu", active_steps=1)
-    top = report.categories[0]
+    top, second = report.categories[0], report.categories[1]
     assert top["category"] == "matmul"
     assert top["self_fraction"] > 0.3
+    # And it dominates, which is the claim rather than merely leading. Measured
+    # minimum over five profiles at this shape: 3.36.
+    assert top["self_fraction"] > 2.0 * second["self_fraction"], (
+        f"matmul {top['self_fraction']:.3f} vs "
+        f"{second['category']} {second['self_fraction']:.3f}"
+    )
 
 
 # ----------------------------------------------------------------- diagnosis
@@ -575,7 +588,9 @@ def test_collective_probe_measures_real_ranks() -> None:
         seq=32,
         steps=12,
         warmup=2,
-        port=29699,
+        # A fixed port collides with a leftover rank from an earlier run, which
+        # fails as "Address already in use" and looks like a real bug.
+        port=free_port(),
     )
     assert payload["world_size"] == 2
     assert payload["grad_bytes"] == payload["n_grad_elements"] * 4

@@ -439,7 +439,12 @@ def _entry(
             device=str(bound),
         )
     except Exception:
-        result = WorkerResult(rank=rank, error=traceback.format_exc())
+        # Carry the backend and device even on the failure path. A rank that
+        # died reporting gloo/cpu when it was launched on NCCL would send the
+        # reader looking in the wrong place.
+        result = WorkerResult(
+            rank=rank, error=traceback.format_exc(), backend=backend, device=device
+        )
     finally:
         if dist.is_initialized():
             dist.destroy_process_group()

@@ -667,11 +667,17 @@ def test_the_cost_model_tracks_a_real_collective_across_three_decades():
 def test_all_three_collectives_are_measured_and_ordered_as_the_ring_model_says():
     """all-gather and reduce-scatter each move half an all-reduce's volume.
 
-    So at a given size their algorithm bandwidth should exceed the all-reduce's,
-    and their bus bandwidths should be closer together than their algorithm
-    bandwidths. gloo has no native ring reduce-scatter, so its reduce-scatter is
-    the slowest of the three; that is a gloo property and it is why the
-    assertion is on all-gather rather than on both.
+    So at a given size their algorithm bandwidth should exceed the all-reduce's.
+    The assertion is on all-gather and not on both, because gloo has no native
+    ring reduce-scatter and services it as an all-reduce plus a slice, which
+    makes it the slowest of the three here.
+
+    That last point is also why this test does *not* claim the three bus
+    bandwidths should be closer together than the three algorithm bandwidths.
+    That is what a ring implementation would give, and it is measurably false on
+    gloo: at world size 2 the algorithm bandwidths span 2.47 to 4.11 GB/s and
+    the bus bandwidths span 1.24 to 3.10, which is wider, not narrower. On NCCL
+    it should hold, and it would be worth asserting there.
     """
     from transformer_internals.cluster.collbench import OPS, run
 

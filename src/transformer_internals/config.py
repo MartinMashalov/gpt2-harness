@@ -195,11 +195,15 @@ class TrainConfig:
             loss scaling; fp16 gets a ``GradScaler`` and is only reachable on
             CUDA. Refused rather than silently downgraded where the device
             cannot do it.
-        reduce_dtype: Dtype the gradient all-reduce carries in the data-parallel
-            paths, ``"fp32"`` (default), ``"bf16"`` or ``"fp16"``. Independent of
-            ``amp_dtype``: it halves the bytes on the wire and costs accuracy in
-            the reduction, which ``results/parallel_comms.json`` measures rather
-            than assumes.
+
+    There is deliberately no ``reduce_dtype`` here. The dtype a gradient
+    reduction carries is a real and separate knob, but :func:`train` is a
+    single-process loop with no reduction in it, so a field here would be a
+    setting that does nothing. It lives where the reductions are:
+    :func:`~transformer_internals.parallel.data_parallel.average_gradients`,
+    :class:`~transformer_internals.parallel.zero.ShardedAdamW` and
+    :class:`~transformer_internals.parallel.zero.Zero3Model` all take it, and
+    ``results/parallel_comms.json`` measures what choosing bf16 costs.
     """
 
     steps: int = 600
@@ -218,7 +222,6 @@ class TrainConfig:
     eval_batches: int = 20
     amp: bool = False
     amp_dtype: Literal["bf16", "fp16"] = "bf16"
-    reduce_dtype: Literal["fp32", "bf16", "fp16"] = "fp32"
     log_every: int = 50
     extra: dict[str, Any] = field(default_factory=dict)
 

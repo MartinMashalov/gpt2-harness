@@ -323,6 +323,10 @@ def select_device(caps: Capabilities, rank: int, backend: str) -> str:
 
     Returns:
         ``"cuda:<n>"`` or ``"cpu"``.
+
+    Raises:
+        HardwareError: If NCCL was chosen with no visible CUDA device, which
+            means the backend selection and the device count disagree.
     """
     if backend != "nccl":
         return "cpu"

@@ -178,18 +178,19 @@ def test_the_meter_tracks_live_memory_and_not_cumulative_traffic():
     meter = ActivationMeter(exclude=[*model.parameters(), *model.buffers()])
     with meter:
         out = model(x, targets=y)
-    at_peak = meter.stash_bytes()
-    storages_at_peak = len(meter._live)
+    before = meter.snapshot()
 
     out["loss"].backward()
     del out
     gc.collect()
+    after = meter.snapshot()
 
+    at_peak = before["activation_bytes"]
     assert at_peak > 0
-    assert storages_at_peak > 10
+    assert before["distinct_storages"] > 10
     # Almost everything the graph held is gone.
-    assert meter.stash_bytes() < 0.05 * at_peak
-    assert len(meter._live) < storages_at_peak / 10
+    assert after["activation_bytes"] < 0.05 * at_peak
+    assert after["distinct_storages"] < before["distinct_storages"] / 10
     # And the high-water mark is not retroactively lowered by the release.
     assert meter.peak_bytes == at_peak
 

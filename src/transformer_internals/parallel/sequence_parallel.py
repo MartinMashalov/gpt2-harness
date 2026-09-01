@@ -270,8 +270,9 @@ def sequence_parallel_worker(
     ring_error = float((ring_out - ref_slice.detach()).abs().max())
 
     # --- backward through the all-gather path ----------------------------
+    # On the CPU and then moved: see the note in tensor_parallel's worker.
     torch.manual_seed(31)
-    grad_out = torch.randn_like(ref_out)
+    grad_out = torch.randn(ref_out.shape, dtype=ref_out.dtype).to(ref_out.device)
     ref_out.backward(grad_out)
     ag_out.backward(grad_out[:, :, rank * t_local : (rank + 1) * t_local].contiguous())
 

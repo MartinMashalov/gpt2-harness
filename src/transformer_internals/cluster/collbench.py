@@ -77,7 +77,9 @@ __all__ = [
     "run",
 ]
 
-DEFAULT_SIZES = [1 << k for k in range(10, 23, 2)]  # 1 KiB .. 4 MiB, elements
+#: Element counts, not bytes. At fp32 these are buffers of 4 KiB to 16 MiB.
+#: scripts/run_collectives.py sweeps wider, 16 KiB to 64 MiB.
+DEFAULT_SIZES = [1 << k for k in range(10, 23, 2)]
 
 #: The collectives this module measures.
 OPS = ("all_reduce", "all_gather", "reduce_scatter")

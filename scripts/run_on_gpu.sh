@@ -21,11 +21,16 @@
 #
 # Usage:
 #   scripts/run_on_gpu.sh --smoke              prove the pipeline, scratch output
-#   scripts/run_on_gpu.sh --smoke --infra-only the same, training-infrastructure stages only
+#   scripts/run_on_gpu.sh --smoke --infra-only the same, infrastructure stages only
 #   scripts/run_on_gpu.sh                      the real sweep, writes results/
-#   scripts/run_on_gpu.sh --resume             the same, skipping completed stages
+#   scripts/run_on_gpu.sh --no-resume          re-run every stage, ignoring markers
 #   scripts/run_on_gpu.sh --stages parallel,collectives
 #   scripts/run_on_gpu.sh --list               show the stages and exit
+#
+# Resuming is the DEFAULT: a stage with a marker under results/.run_state is
+# skipped. That is what makes a crashed run cheap to continue, and it also means
+# a re-run after a code change will report stale stages as done. Use --no-resume
+# for that, or delete the one marker you want redone.
 #
 # The stages that need the published GPT-2 checkpoint are marked optional: a
 # failure in one is reported and the run continues, so a box with no network
@@ -58,7 +63,8 @@ ASSETS_DIR="assets"
 BASELINE_REF="HEAD"
 
 usage() {
-    sed -n '2,32p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+    # Every comment line of the header, so --help cannot end mid-sentence.
+    sed -n '2,/^set -o errexit/p' "${BASH_SOURCE[0]}" | grep '^#' | sed 's/^# \{0,1\}//'
     exit 0
 }
 
@@ -298,7 +304,10 @@ run_stage() {
     warn ""
     warn "  Stopping. Every stage that already succeeded is checkpointed, so"
     warn "  re-running this script picks up from here:"
-    warn "      scripts/run_on_gpu.sh${SMOKE:+ --smoke} --resume"
+    # Not ${SMOKE:+...}: that expands on the string "0" because "0" is non-null,
+    # so a FULL run that died at hour two would print advice that resumes into
+    # smoke mode, write to smoke/ and report "Smoke run complete."
+    warn "      scripts/run_on_gpu.sh$([[ $SMOKE -eq 1 ]] && echo ' --smoke')$([[ $INFRA_ONLY -eq 1 ]] && echo ' --infra-only') --resume"
     exit "$status"
 }
 

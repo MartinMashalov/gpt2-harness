@@ -334,8 +334,11 @@ def tp_equivalence_worker(
 
     # A fixed, non-uniform upstream gradient. A uniform one would hide a bug
     # that only shows up when the incoming gradient varies over the sequence.
+    # Drawn on the CPU and moved, like every other tensor in this package: a
+    # randn_like on a CUDA tensor draws from the CUDA RNG, and the comparison
+    # would then be against a different upstream gradient on a different device.
     torch.manual_seed(100)
-    grad_out = torch.randn_like(ref_out)
+    grad_out = torch.randn(ref_out.shape, dtype=ref_out.dtype).to(ref_out.device)
     ref_out.backward(grad_out)
     tp_out.backward(grad_out.clone())
 
