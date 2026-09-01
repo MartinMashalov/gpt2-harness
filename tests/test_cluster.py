@@ -20,7 +20,7 @@ import pytest
 import torch
 
 import transformer_internals.cluster.checkpoint as checkpoint_module
-from conftest import machine_is_oversubscribed
+from conftest import machine_is_oversubscribed, no_headroom_for
 from transformer_internals.cluster.checkpoint import (
     REPLICATE,
     AsyncCheckpointer,
@@ -795,7 +795,7 @@ def test_all_three_collectives_are_measured_and_ordered_as_the_ring_model_says()
     # only where a rate means something. On a machine with more runnable
     # processes than cores the two collectives are timed in different moments of
     # somebody else's work.
-    if machine_is_oversubscribed():
+    if machine_is_oversubscribed() or no_headroom_for(2):
         return
     biggest = {op: data["by_op"][op]["points"][-1] for op in OPS}
     assert (

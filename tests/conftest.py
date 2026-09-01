@@ -126,3 +126,29 @@ def gpt2_pair(gpt2_available: bool):
     ).eval()
     tok = BPETokenizer.from_pretrained(ckpt)
     return model, ref, tok
+
+
+def no_headroom_for(world_size: int) -> bool:
+    """True when a timed multi-process run has no spare core to be timed on.
+
+    ``machine_is_oversubscribed`` reads the load average, which is a one-minute
+    average and therefore says nothing about the load this test is about to
+    create itself. A two-core CI runner sitting idle passes that check, then
+    spawns ``world_size`` workers and times a collective between them with zero
+    cores left over. The two rates being compared are then a comparison of
+    scheduler luck, which is what took a CI leg down: all-gather measured
+    1.77 GB/s against all-reduce's 2.07 on a two-core runner at world size 2,
+    reversing an ordering that holds with room to spare on any machine that has
+    a spare core.
+
+    A comparison of two measured rates needs at least one core that is not
+    already committed to a worker.
+    """
+    cores = os.cpu_count() or 1
+    if cores - world_size < 1:
+        print(
+            f"\n[timing] not asserting on wall clock: {cores} cores and "
+            f"world size {world_size} leaves no core to absorb the measurement"
+        )
+        return True
+    return False
