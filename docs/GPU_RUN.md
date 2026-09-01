@@ -26,10 +26,11 @@ made. Change `--stub-capability` to `9.0` to see what an H100 node resolves to,
 or `7.0` to watch bf16 be refused with fp16 named as the alternative.
 
 The second runs the whole training-infrastructure pipeline at tiny sizes into a
-scratch tree. **Measured on the development laptop over three runs: 5m29s, 6m17s
-and 6m54s**, the last with the machine at a load average of 176 from unrelated
-work. Per-stage times land in `smoke/results/.run_state/timings.tsv`. Adding the
-weight-dependent stages (drop `--infra-only`) took about twelve minutes there.
+scratch tree. **Measured on the development laptop over four runs: 5m29s, 6m17s,
+6m54s and 7m30s**, the last three with the machine at a load average of 176 on
+ten cores from unrelated work. Per-stage times land in
+`smoke/results/.run_state/timings.tsv`. Adding the weight-dependent stages (drop
+`--infra-only`) took about twelve minutes there.
 
 If either fails, fix it before renting. Neither needs a GPU.
 
