@@ -49,7 +49,11 @@ import torch.nn.functional as F
 from transformer_internals.config import GPTConfig
 from transformer_internals.model import Block
 from transformer_internals.parallel import comms
-from transformer_internals.parallel.common import identical_block, parallel_config
+from transformer_internals.parallel.common import (
+    current_device,
+    identical_block,
+    parallel_config,
+)
 
 __all__ = [
     "ColumnParallelLinear",
@@ -236,7 +240,14 @@ class TensorParallelBlock(nn.Module):
 
         self.register_buffer(
             "causal_mask",
-            torch.tril(torch.ones(config.n_positions, config.n_positions, dtype=torch.bool)),
+            torch.tril(
+                torch.ones(
+                    config.n_positions,
+                    config.n_positions,
+                    dtype=torch.bool,
+                    device=block.ln_1.weight.device,
+                )
+            ),
             persistent=False,
         )
 
@@ -305,7 +316,7 @@ def tp_equivalence_worker(
     tp = TensorParallelBlock(ref, rank=rank, world_size=world_size)
 
     torch.manual_seed(99)
-    x = torch.randn(batch, seq, config.n_embd)
+    x = torch.randn(batch, seq, config.n_embd).to(current_device())
     x_ref = x.clone().requires_grad_(True)
     x_tp = x.clone().requires_grad_(True)
 

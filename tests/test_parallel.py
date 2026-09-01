@@ -1,11 +1,13 @@
 """Equivalence proofs for the five parallelism strategies.
 
-Every test here spawns real ``torch.distributed`` processes on the gloo backend
-and compares the sharded result against a single-process reference computed in
-the same process. There is no GPU and no cluster involved, and none is needed:
-whether a sharded implementation computes the right function is a property of
-the algorithm, and it is the property that is hardest to get right and easiest
-to fake.
+Every test here spawns real ``torch.distributed`` processes and compares the
+sharded result against a single-process reference computed in the same process.
+The backend is chosen from the machine -- gloo here, NCCL on a CUDA box -- and
+the assertions are the same either way, which is the point: whether a sharded
+implementation computes the right function is a property of the algorithm, not
+of the wire. There is no GPU and no cluster involved in CI, and none is needed:
+correctness is the property that is hardest to get right and easiest to fake,
+and it is exactly the one that does not need special hardware to check.
 
 The tolerance is 1e-5 throughout, which is loose compared to what is actually
 measured (see the numbers in ``results/parallel_comms.json``). It is set by the
@@ -23,6 +25,7 @@ from typing import Any
 import pytest
 import torch
 
+from transformer_internals.hardware import Capabilities, HardwareError
 from transformer_internals.parallel import comms
 from transformer_internals.parallel.data_parallel import (
     DEFAULT_BUCKET_BYTES,
@@ -56,6 +59,36 @@ def run(fn, world_size: int, **kwargs) -> list[Any]:
     if key not in _CACHE:
         _CACHE[key] = comms.spawn_workers(fn, world_size, kwargs, timeout=300)
     return _CACHE[key]
+
+
+# --------------------------------------------------------------------------- #
+# launcher: backend and placement
+# --------------------------------------------------------------------------- #
+
+
+def test_workers_report_the_backend_and_device_they_actually_ran_on():
+    """Not what was asked for. What ran."""
+    results = run(ddp_equivalence_worker, 2, batch=8, seq=16, steps=3)
+    for r in results:
+        assert r.backend in ("gloo", "nccl")
+        assert r.device.startswith("cpu") or r.device.startswith("cuda")
+    if not torch.cuda.is_available():
+        assert all(r.backend == "gloo" and r.device == "cpu" for r in results)
+
+
+def test_an_impossible_placement_fails_in_the_parent_before_any_process_starts():
+    """Eight NCCL ranks on a two-GPU box is one sentence, not eight tracebacks."""
+    two_gpus = Capabilities.stub(device_count=2)
+    with pytest.raises(HardwareError, match="exceeds the 2 visible"):
+        comms.spawn_workers(ddp_equivalence_worker, 8, {}, caps=two_gpus)
+
+
+def test_requesting_nccl_on_this_machine_says_why_it_cannot():
+    caps = Capabilities.detect()
+    if caps.cuda_available and caps.nccl_available:
+        pytest.skip("this machine has CUDA and NCCL, so the request succeeds")
+    with pytest.raises(HardwareError):
+        comms.spawn_workers(ddp_equivalence_worker, 2, {}, backend="nccl", caps=caps)
 
 
 # --------------------------------------------------------------------------- #

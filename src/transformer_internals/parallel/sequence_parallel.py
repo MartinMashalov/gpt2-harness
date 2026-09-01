@@ -43,7 +43,11 @@ import torch
 import torch.nn.functional as F
 
 from transformer_internals.parallel import comms
-from transformer_internals.parallel.common import identical_block, parallel_config
+from transformer_internals.parallel.common import (
+    current_device,
+    identical_block,
+    parallel_config,
+)
 
 __all__ = [
     "all_gather_kv_attention",
@@ -70,7 +74,9 @@ class _GatherSequence(torch.autograd.Function):
         ctx.world_size = world_size
         moved = x.movedim(dim, 0).contiguous()
         out = torch.empty(
-            (moved.shape[0] * world_size, *moved.shape[1:]), dtype=moved.dtype
+            (moved.shape[0] * world_size, *moved.shape[1:]),
+            dtype=moved.dtype,
+            device=moved.device,
         )
         comms.all_gather_into(out, moved)
         return out.movedim(0, dim).contiguous()
@@ -79,7 +85,9 @@ class _GatherSequence(torch.autograd.Function):
     def backward(ctx: Any, grad: torch.Tensor):  # type: ignore[override]
         moved = grad.movedim(ctx.dim, 0).contiguous()
         shard = torch.empty(
-            (moved.shape[0] // ctx.world_size, *moved.shape[1:]), dtype=moved.dtype
+            (moved.shape[0] // ctx.world_size, *moved.shape[1:]),
+            dtype=moved.dtype,
+            device=moved.device,
         )
         comms.reduce_scatter_into(shard, moved)
         return shard.movedim(0, ctx.dim).contiguous(), None, None
@@ -153,9 +161,10 @@ def ring_attention(
         ``(B, H, T/p, d)`` -- this rank's rows of the full attention output.
     """
     b, h, t_local, head_dim = q_local.shape
+    device = q_local.device
     scale = 1.0 / math.sqrt(head_dim)
-    running_max = torch.full((b, h, t_local, 1), float("-inf"))
-    running_sum = torch.zeros((b, h, t_local, 1))
+    running_max = torch.full((b, h, t_local, 1), float("-inf"), device=device)
+    running_sum = torch.zeros((b, h, t_local, 1), device=device)
     acc = torch.zeros_like(q_local)
 
     k_cur, v_cur = k_local.contiguous(), v_local.contiguous()
@@ -164,7 +173,9 @@ def ring_attention(
         if block <= rank:
             scores = (q_local @ k_cur.transpose(-2, -1)) * scale
             if block == rank:
-                tri = torch.tril(torch.ones(t_local, t_local, dtype=torch.bool))
+                tri = torch.tril(
+                    torch.ones(t_local, t_local, dtype=torch.bool, device=device)
+                )
                 scores = scores.masked_fill(~tri.view(1, 1, t_local, t_local), float("-inf"))
             new_max = torch.maximum(running_max, scores.amax(dim=-1, keepdim=True))
             rescale = torch.exp(running_max - new_max)
@@ -235,7 +246,7 @@ def sequence_parallel_worker(
     cp_attn = identical_block(config, seed=11).attn
 
     torch.manual_seed(21)
-    x = torch.randn(batch, seq, config.n_embd)
+    x = torch.randn(batch, seq, config.n_embd).to(current_device())
     x_ref = x.clone().requires_grad_(True)
     x_local = x[:, rank * t_local : (rank + 1) * t_local].clone().requires_grad_(True)
 

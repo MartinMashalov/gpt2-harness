@@ -88,8 +88,8 @@ def _padded_numel(total: int, world_size: int) -> int:
 
 
 def _flatten(tensors: Sequence[torch.Tensor], numel: int) -> torch.Tensor:
-    """Concatenate into one padded flat fp32 buffer."""
-    flat = torch.zeros(numel, dtype=tensors[0].dtype)
+    """Concatenate into one padded flat buffer, on the tensors' own device."""
+    flat = torch.zeros(numel, dtype=tensors[0].dtype, device=tensors[0].device)
     offset = 0
     for t in tensors:
         n = t.numel()
@@ -109,7 +109,10 @@ def decay_mask(params: Sequence[nn.Parameter]) -> torch.Tensor:
     has to be expressible per element.
     """
     return torch.cat(
-        [torch.full((p.numel(),), float(p.dim() >= 2)) for p in params]
+        [
+            torch.full((p.numel(),), float(p.dim() >= 2), device=p.device)
+            for p in params
+        ]
     )
 
 
@@ -200,22 +203,23 @@ class ShardedAdamW:
         self.shard_size = self.padded // world_size
         self.shard_start = rank * self.shard_size
 
+        device = self.params[0].device
         full_decay = (
             decay_mask(self.params) * weight_decay
             if decay_matmul_only
-            else torch.full((self.numel,), weight_decay)
+            else torch.full((self.numel,), weight_decay, device=device)
         )
-        padded_decay = torch.zeros(self.padded)
+        padded_decay = torch.zeros(self.padded, device=device)
         padded_decay[: self.numel] = full_decay
         #: Per-element weight decay for this rank's shard only.
         self.decay = padded_decay[self.shard_start : self.shard_start + self.shard_size].clone()
 
         # The sharded state. This is the memory ZeRO exists to save: 2 * N/p
         # elements instead of 2 * N.
-        self.exp_avg = torch.zeros(self.shard_size)
-        self.exp_avg_sq = torch.zeros(self.shard_size)
+        self.exp_avg = torch.zeros(self.shard_size, device=device)
+        self.exp_avg_sq = torch.zeros(self.shard_size, device=device)
         #: Stage 2 keeps the reduced gradient shard here and frees ``p.grad``.
-        self.grad_shard = torch.zeros(self.shard_size)
+        self.grad_shard = torch.zeros(self.shard_size, device=device)
 
     # -- memory accounting ------------------------------------------------
 
@@ -297,7 +301,7 @@ class ShardedAdamW:
         # Every rank needs every parameter for the next forward pass, so the
         # updated shards go back out. This all-gather is the second half of what
         # DDP's all-reduce was doing all along.
-        gathered = torch.empty(self.padded)
+        gathered = torch.empty(self.padded, device=shard.device)
         comms.all_gather_into(gathered, shard)
 
         offset = 0
@@ -342,7 +346,9 @@ class _GatherRunFree(torch.autograd.Function):
         ctx.world_size = world_size
         ctx.save_for_backward(x, shard)
         with torch.no_grad():
-            full = torch.empty(shard.numel() * world_size, dtype=shard.dtype)
+            full = torch.empty(
+                shard.numel() * world_size, dtype=shard.dtype, device=shard.device
+            )
             comms.all_gather_into(full, shard)
             out = _run_unit(module, full, meta, x)
             del full
@@ -352,7 +358,9 @@ class _GatherRunFree(torch.autograd.Function):
     def backward(ctx: Any, grad_out: torch.Tensor):  # type: ignore[override]
         x, shard = ctx.saved_tensors
         world_size = ctx.world_size
-        full = torch.empty(shard.numel() * world_size, dtype=shard.dtype)
+        full = torch.empty(
+            shard.numel() * world_size, dtype=shard.dtype, device=shard.device
+        )
         comms.all_gather_into(full, shard)
         full.requires_grad_(True)
         x_in = x.detach().requires_grad_(True)
@@ -422,7 +430,7 @@ class Zero3Model(nn.Module):
             # Release the replicated copies. This is the memory saving; without
             # it the shard would merely be a fourth copy of the same weights.
             for _, p in named:
-                p.data = torch.empty(0)
+                p.data = torch.empty(0, device=p.device)
                 p.requires_grad_(False)
 
         #: Parameters outside the blocks, replicated across ranks.
@@ -435,11 +443,15 @@ class Zero3Model(nn.Module):
     def unit_decay_mask(self, unit: int, weight_decay: float) -> torch.Tensor:
         """Per-element weight decay for this rank's shard of one unit."""
         meta = self.unit_meta[unit]
+        device = self.shards[unit].device
         full = torch.cat(
-            [torch.full((numel,), float(len(shape) >= 2)) for _, shape, numel in meta]
+            [
+                torch.full((numel,), float(len(shape) >= 2), device=device)
+                for _, shape, numel in meta
+            ]
         )
         shard_size = self.shards[unit].numel()
-        padded = torch.zeros(shard_size * self.world_size)
+        padded = torch.zeros(shard_size * self.world_size, device=device)
         padded[: full.numel()] = full
         return padded[self.rank * shard_size : (self.rank + 1) * shard_size] * weight_decay
 
@@ -574,7 +586,9 @@ class Zero3AdamW:
     def gathered_block_params(self, unit: int) -> torch.Tensor:
         """All-gather one unit's flat parameter, for comparison against a reference."""
         shard = self.model.shards[unit]
-        full = torch.empty(shard.numel() * self.model.world_size, dtype=shard.dtype)
+        full = torch.empty(
+            shard.numel() * self.model.world_size, dtype=shard.dtype, device=shard.device
+        )
         comms.all_gather_into(full, shard.detach())
         return full
 

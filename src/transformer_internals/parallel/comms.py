@@ -40,6 +40,22 @@ The distinction matters because gloo does not implement a ring reduce-scatter:
 slice, so this machine really moves all-reduce volume for it. The payload count
 is still exactly right, and the wire model still says what an NCCL ring on real
 hardware would move. Both are reported; neither is presented as the other.
+
+Backend
+-------
+:func:`spawn_workers` opens NCCL when there is CUDA and gloo otherwise, decided
+by :mod:`transformer_internals.hardware`. The workers themselves are unchanged
+between the two: they allocate on the device
+:func:`~transformer_internals.parallel.common.current_device` reports, which the
+launcher sets per rank before the process group is opened. The counting above is
+backend-independent by construction -- it counts the buffer handed to the call,
+which is a property of the algorithm -- so the same result schema comes out
+either way and every figure redraws unchanged.
+
+One ordering rule matters and is easy to get wrong: ``torch.cuda.set_device``
+must be called **before** ``init_process_group``. NCCL binds a rank to whatever
+device is current at initialisation, so getting this wrong puts two ranks on GPU
+0 and hangs the first collective with no error at all.
 """
 
 from __future__ import annotations
@@ -58,6 +74,9 @@ from typing import Any
 import torch
 import torch.distributed as dist
 
+from transformer_internals import hardware
+from transformer_internals.parallel import common
+
 __all__ = [
     "CollectiveRecord",
     "CommCounter",
@@ -73,6 +92,7 @@ __all__ = [
     "reduce_scatter_into",
     "send",
     "spawn_workers",
+    "synchronize",
 ]
 
 
@@ -322,6 +342,15 @@ def isend(tensor: torch.Tensor, dst: int, tag: int = 0, group: Any = None) -> Se
     return SendHandle(dist.isend(buf, dst=dst, tag=tag, group=group), buf)
 
 
+def synchronize() -> None:
+    """Block until this rank's queued device work has finished.
+
+    A no-op on CPU. On CUDA it is what makes a wall-clock number mean anything:
+    without it, a timing measures how fast Python enqueued the kernels.
+    """
+    hardware.synchronize(common.current_device())
+
+
 # --------------------------------------------------------------------------- #
 # launcher
 # --------------------------------------------------------------------------- #
@@ -329,12 +358,19 @@ def isend(tensor: torch.Tensor, dst: int, tag: int = 0, group: Any = None) -> Se
 
 @dataclass
 class WorkerResult:
-    """What one rank returned, or the traceback that stopped it."""
+    """What one rank returned, or the traceback that stopped it.
+
+    ``backend`` and ``device`` are recorded per rank rather than assumed by the
+    caller, so a result file always says what actually ran rather than what was
+    asked for.
+    """
 
     rank: int
     value: Any = None
     error: str | None = None
     payload: dict[str, Any] = field(default_factory=dict)
+    backend: str = "gloo"
+    device: str = "cpu"
 
 
 def _entry(
@@ -344,21 +380,34 @@ def _entry(
     fn: Callable[..., Any],
     kwargs: dict[str, Any],
     queue: Any,
+    backend: str,
+    device: str,
 ) -> None:
-    """Child-process entry point: init the group, run ``fn``, report back."""
+    """Child-process entry point: bind the device, init the group, run ``fn``."""
     # One thread per rank. Without this, p ranks each spin up a full BLAS thread
     # pool on the same cores and the pipeline timing measurements become noise.
+    # Harmless on CUDA, where the host threads are not doing the arithmetic.
     torch.set_num_threads(1)
     try:
+        # Before init_process_group, not after: see the module docstring.
+        bound = hardware.set_visible_device(device)
+        common.set_device(bound)
         dist.init_process_group(
-            backend="gloo",
+            backend=backend,
             init_method=f"file://{store_file}",
             rank=rank,
             world_size=world_size,
         )
         with counter_scope(world_size) as counted:
             value = fn(rank=rank, world_size=world_size, **kwargs)
-        result = WorkerResult(rank=rank, value=value, payload=counted.summary())
+        synchronize()
+        result = WorkerResult(
+            rank=rank,
+            value=value,
+            payload=counted.summary(),
+            backend=backend,
+            device=str(bound),
+        )
     except Exception:
         result = WorkerResult(rank=rank, error=traceback.format_exc())
     finally:
@@ -372,6 +421,9 @@ def spawn_workers(
     world_size: int,
     kwargs: dict[str, Any] | None = None,
     timeout: float = 300.0,
+    backend: str | None = None,
+    caps: hardware.Capabilities | None = None,
+    allow_oversubscribe: bool = False,
 ) -> list[WorkerResult]:
     """Run ``fn`` on ``world_size`` gloo processes and collect what each returned.
 
@@ -388,6 +440,11 @@ def spawn_workers(
         world_size: Number of processes.
         kwargs: Extra keyword arguments forwarded to ``fn``.
         timeout: Seconds to wait for the whole group.
+        backend: ``"nccl"``, ``"gloo"``, or ``None`` to choose from the machine.
+        caps: Machine description; detected when omitted. Passing a stub here is
+            how the placement logic is tested without a GPU.
+        allow_oversubscribe: Permit more ranks than GPUs. Correctness proofs
+            survive it; timings do not, so it is off by default.
 
     Returns:
         One :class:`WorkerResult` per rank, ordered by rank. A rank that raised
@@ -395,8 +452,18 @@ def spawn_workers(
 
     Raises:
         RuntimeError: If a rank did not report within ``timeout``.
+        HardwareError: If the requested backend or world size is impossible on
+            this machine. Raised here, in the parent, before any process is
+            started, so the failure is one sentence rather than ``world_size``
+            simultaneous tracebacks.
     """
     import torch.multiprocessing as mp
+
+    caps = caps if caps is not None else hardware.Capabilities.detect()
+    chosen = hardware.select_backend(caps, backend)
+    devices = hardware.check_placement(
+        caps, world_size, chosen, allow_oversubscribe=allow_oversubscribe
+    )
 
     ctx = mp.get_context("spawn")
     tmpdir = tempfile.mkdtemp(prefix="ti-parallel-")
@@ -405,7 +472,16 @@ def spawn_workers(
     procs = [
         ctx.Process(
             target=_entry,
-            args=(rank, world_size, store_file, fn, kwargs or {}, q),
+            args=(
+                rank,
+                world_size,
+                store_file,
+                fn,
+                kwargs or {},
+                q,
+                chosen,
+                devices[rank],
+            ),
             daemon=True,
         )
         for rank in range(world_size)

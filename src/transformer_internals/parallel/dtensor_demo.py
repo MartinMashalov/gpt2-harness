@@ -25,6 +25,11 @@ placements.
 API note: on torch 2.2 (this repository's pinned version) DTensor lives at
 ``torch.distributed._tensor``. It moved to the public ``torch.distributed.tensor``
 in 2.5.
+
+The mesh is built over whatever device this rank was placed on, so the same
+worker runs on a CPU gloo group and on a CUDA NCCL group. ``DeviceMesh`` takes a
+device *type*, not a device index -- the index comes from the rank's current
+CUDA device, which the launcher set before the process group was opened.
 """
 
 from __future__ import annotations
@@ -35,7 +40,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from transformer_internals.parallel.common import parallel_config
+from transformer_internals.parallel.common import current_device, parallel_config
 from transformer_internals.parallel.tensor_parallel import (
     ColumnParallelLinear,
     RowParallelLinear,
@@ -72,15 +77,17 @@ def dtensor_worker(
     )
 
     config = parallel_config(**(config_kwargs or {}))
+    device = current_device()
     n_embd = config.n_embd
     fc, proj = _reference_mlp(n_embd)
+    fc, proj = fc.to(device), proj.to(device)
 
     torch.manual_seed(6)
-    x = torch.randn(batch, seq, n_embd)
+    x = torch.randn(batch, seq, n_embd).to(device)
     reference = proj(F.gelu(fc(x)))
 
     # --- device mesh, placements written out by hand ---------------------
-    mesh = DeviceMesh("cpu", torch.arange(world_size))
+    mesh = DeviceMesh(device.type, torch.arange(world_size))
     d_fc_w = distribute_tensor(fc.weight, mesh, [Shard(0)])
     d_fc_b = distribute_tensor(fc.bias, mesh, [Shard(0)])
     d_proj_w = distribute_tensor(proj.weight, mesh, [Shard(1)])
@@ -96,6 +103,7 @@ def dtensor_worker(
     plan_mlp = nn.Sequential()
     plan_mlp.add_module("fc", nn.Linear(n_embd, 4 * n_embd))
     plan_mlp.add_module("proj", nn.Linear(4 * n_embd, n_embd))
+    plan_mlp = plan_mlp.to(device)
     plan_mlp.fc.load_state_dict(fc.state_dict())
     plan_mlp.proj.load_state_dict(proj.state_dict())
     parallelize_module(

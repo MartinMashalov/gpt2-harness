@@ -36,7 +36,12 @@ import torch.distributed as dist
 import torch.nn as nn
 
 from transformer_internals.parallel import comms
-from transformer_internals.parallel.common import identical_batch, identical_model, parallel_config
+from transformer_internals.parallel.common import (
+    current_device,
+    identical_batch,
+    identical_model,
+    parallel_config,
+)
 
 __all__ = [
     "PipelineStage",
@@ -121,7 +126,9 @@ def _reference_model(config) -> nn.Module:
     a pipeline bug and not a weight-tying difference.
     """
     model = identical_model(config, seed=0)
-    model.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
+    model.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False).to(
+        current_device()
+    )
     model.lm_head.weight = nn.Parameter(model.wte.weight.detach().clone())
     return model
 
@@ -273,6 +280,7 @@ def _run_pipeline_step(
         stage.
     """
     m = len(micro_inputs)
+    device = micro_inputs[0].device
     ops = schedule_order(rank, world_size, m, kind)
     inputs: dict[int, torch.Tensor] = {}
     outputs: dict[int, torch.Tensor] = {}
@@ -285,7 +293,7 @@ def _run_pipeline_step(
             if stage.is_first:
                 x = micro_inputs[i]
             else:
-                buf = torch.empty(hidden_shape)
+                buf = torch.empty(hidden_shape, device=device)
                 with timer("comm"):
                     comms.recv(buf, src=rank - 1)
                 x = buf.requires_grad_(True)
@@ -314,7 +322,7 @@ def _run_pipeline_step(
                 with timer("compute"):
                     out.backward()
             else:
-                grad = torch.empty(hidden_shape)
+                grad = torch.empty(hidden_shape, device=device)
                 with timer("comm"):
                     comms.recv(grad, src=rank + 1)
                 with timer("compute"):
