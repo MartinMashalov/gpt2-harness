@@ -245,6 +245,15 @@ def main() -> int:
         help="relative change below which a number is not worth mentioning",
     )
     ap.add_argument("--limit", type=int, default=40, help="rows per section")
+    ap.add_argument(
+        "--allow-changes",
+        action="store_true",
+        help=(
+            "report differences but always exit 0. For the smoke run, whose "
+            "results come from deliberately tiny configurations and therefore "
+            "differ from the committed full-size ones by design."
+        ),
+    )
     args = ap.parse_args()
 
     current_dir = Path(args.current)
@@ -304,6 +313,13 @@ def main() -> int:
     # A moved invariant is the one thing that should make this exit non-zero: it
     # means a number that cannot legitimately depend on the hardware did.
     if moved_inv:
+        if args.allow_changes:
+            print(
+                f"\n--allow-changes: {len(moved_inv)} correctness invariant(s) differ "
+                f"from the baseline. Expected when the two runs used different "
+                f"configurations, as a smoke run does. Exiting 0."
+            )
+            return 0
         print(f"\nFAILED: {len(moved_inv)} correctness invariant(s) changed")
         return 1
     print("\nOK: every correctness invariant held")

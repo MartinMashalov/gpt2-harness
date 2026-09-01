@@ -39,3 +39,9 @@ wandb/
 # notes/ holds working notes written while building a part, for whoever
 # integrates it. They are not part of the published repository.
 notes/
+
+# Scratch output from `scripts/run_on_gpu.sh --smoke`, and the per-run state it
+# keeps so a crashed run can resume. Neither is a measurement: the smoke tree is
+# deliberately tiny sizes, and the state directory is stage markers and logs.
+smoke/
+results/.run_state/

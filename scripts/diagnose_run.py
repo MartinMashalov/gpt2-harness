@@ -173,6 +173,15 @@ def main() -> int:
     ap.add_argument("--port", type=int, default=29551)
     ap.add_argument("--skip-distributed", action="store_true")
     ap.add_argument("--reuse-peak", action="store_true", help="read results/roofline.json")
+    ap.add_argument(
+        "--report-only",
+        action="store_true",
+        help=(
+            "print the verdicts and exit 0 even when the tool missed an injected "
+            "fault. For the smoke run, where the configurations are too small for "
+            "the faults to be the dominant cost and a FAIL is the correct answer."
+        ),
+    )
     ap.add_argument("--out", default=str(RESULTS / "diagnosis.json"))
     ap.add_argument(
         "--assets",
@@ -350,6 +359,12 @@ def main() -> int:
     fig = fig_step_breakdown(payload["reports"], assets / "step_breakdown.png")
     print(f"\nwrote {fig}")
     fig_step_breakdown(payload["reports"], assets / "step_breakdown_web.png", web=True)
+    if args.report_only and not all_ok:
+        print(
+            "\n--report-only: the tool missed an injected fault, which at these "
+            "sizes is the correct answer rather than a regression. Exiting 0."
+        )
+        return 0
     return 0 if all_ok else 1
 
 
