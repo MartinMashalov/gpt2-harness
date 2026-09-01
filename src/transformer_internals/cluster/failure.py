@@ -324,7 +324,12 @@ def launch(
                 return False, [p.poll() for p in procs], kill_time
             if all(c == 0 for c in codes):
                 return True, codes, kill_time
-            time.sleep(0.02)
+            # While a kill is still pending, poll hard. A step of this job takes
+            # single-digit milliseconds, so a 20 ms supervisor loop can be two or
+            # three steps late, and "kill at step 12" then lands after the step-15
+            # checkpoint has already been written. A supervisor that is late by
+            # more than a step is not injecting the failure it says it is.
+            time.sleep(0.002 if (kill_rank_at_step is not None and kill_time is None) else 0.02)
     finally:
         for p in procs:
             if p.poll() is None:
