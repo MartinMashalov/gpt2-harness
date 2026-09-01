@@ -45,6 +45,7 @@ as :data:`GPUDIRECT_PENALTY`, applied to the inter-node fabrics when it is off.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 __all__ = [
     "GPUDIRECT_PENALTY",
@@ -55,6 +56,8 @@ __all__ = [
     "all_reduce_time",
     "compute_time_s",
     "format_report",
+    "link_from_measurement",
+    "predicted_vs_measured",
     "step_costs",
 ]
 
@@ -71,6 +74,14 @@ class Link:
             vendors do not publish a single comparable number.
         source: Where ``gbytes_per_s`` comes from.
         inter_node: Whether traffic on this link leaves the chassis.
+        measured: True when the numbers came from
+            :mod:`transformer_internals.cluster.collbench` running on this
+            machine rather than from a datasheet. Every report prints it,
+            because a modelled link and a measured one are different claims and
+            the difference must survive being copied into a table.
+        efficiency_applied: True when ``gbytes_per_s`` is already an achieved
+            rate and :data:`LINK_EFFICIENCY` must therefore *not* be applied to
+            it again. Measured links set this; published peaks do not.
     """
 
     name: str
@@ -78,6 +89,8 @@ class Link:
     latency_us: float
     source: str
     inter_node: bool
+    measured: bool = False
+    efficiency_applied: bool = False
 
 
 #: Published peak bandwidths. The per-GPU figures are unidirectional: NVIDIA
@@ -184,8 +197,133 @@ class ParallelConfig:
         return self.tp * self.pp * self.cp * self.dp
 
 
+def link_from_measurement(
+    name: str,
+    fit: dict[str, float],
+    ranks: int,
+    op: str = "all_reduce",
+    peak_bus_gbytes_per_s: float | None = None,
+    inter_node: bool = False,
+    detail: str = "",
+) -> Link:
+    """Build a :class:`Link` from a measured collective sweep.
+
+    This is how the datasheet numbers get replaced. Run
+    :func:`transformer_internals.cluster.collbench.run` on the hardware, hand
+    its all-reduce fit here, and every cost in this module is then computed from
+    a number that came off a wire.
+
+    The bandwidth taken is the *fitted* one, not the peak of the sweep, because
+    the model's form is ``time = latency + bytes / bandwidth`` and the fitted
+    slope is that model's own bandwidth parameter. The peak is carried in the
+    source string so the two can be compared.
+
+    ``efficiency_applied`` is set, so :data:`LINK_EFFICIENCY` is not applied on
+    top: the measurement already *is* the achieved rate, and multiplying an
+    achieved rate by an efficiency assumption would be counting the same
+    derating twice.
+
+    The fitted intercept is divided by the number of ring hops, and this matters
+    by a factor of ``2(n-1)``. ``Link.latency_us`` is a **per-hop** latency,
+    because :func:`all_reduce_time` multiplies it by the hop count; the
+    intercept of a fit to whole-collective times is the latency of the whole
+    collective. Carrying one across as the other makes the model overpredict
+    small messages by six times at eight ranks, which is exactly the regime
+    where latency is the only thing that matters.
+
+    Args:
+        name: Human name for the link.
+        fit: A fit from :func:`collbench.fit_link_model`, carrying
+            ``bandwidth_gbytes_per_s``, ``latency_us`` and ``r_squared``.
+        ranks: World size the sweep ran at, needed for the hop count.
+        op: Which collective was fitted, also for the hop count.
+        peak_bus_gbytes_per_s: Best bus bandwidth seen in the sweep, for the
+            record.
+        inter_node: Whether this link leaves the chassis.
+        detail: Extra provenance, such as the backend and the world size.
+
+    Returns:
+        A :class:`Link` with ``measured=True``.
+    """
+    hops = max(_ring_hops(op, ranks), 1)
+    per_hop_us = max(float(fit["latency_us"]), 0.0) / hops
+    peak = f", peak bus {peak_bus_gbytes_per_s:.2f} GB/s" if peak_bus_gbytes_per_s else ""
+    return Link(
+        name=name,
+        gbytes_per_s=float(fit["bandwidth_gbytes_per_s"]),
+        latency_us=per_hop_us,
+        source=(
+            f"MEASURED by transformer_internals.cluster.collbench, {op} at {ranks} ranks. "
+            f"Fitted t = {fit['latency_us']:.1f}us + "
+            f"bytes/{fit['bandwidth_gbytes_per_s']:.2f} GB/s, "
+            f"R^2 = {fit['r_squared']:.4f}{peak}. Latency divided by {hops} ring hops "
+            f"to give the per-hop figure this model uses. {detail}".strip()
+        ),
+        inter_node=inter_node,
+        measured=True,
+        efficiency_applied=True,
+    )
+
+
+def _ring_hops(op: str, ranks: int) -> int:
+    """Ring hops a collective takes: ``2(n-1)`` for all-reduce, ``n-1`` otherwise."""
+    if ranks < 2:
+        return 0
+    return 2 * (ranks - 1) if op == "all_reduce" else ranks - 1
+
+
+def predicted_vs_measured(
+    points: list[dict[str, Any]],
+    ranks: int,
+    link: Link,
+    op: str = "all_reduce",
+) -> list[dict[str, Any]]:
+    """Check the cost model against the collective sweep it was fitted to.
+
+    A model fitted to data and then evaluated on the same data is not a
+    prediction, so the useful reading is the *shape* of the residual: an affine
+    model should track a bandwidth-bound collective closely and should be worst
+    at the smallest messages, where the real cost is scheduling rather than
+    either latency or bandwidth. That failure is the model's own point, and this
+    function makes it visible rather than averaging it away.
+
+    Args:
+        points: Measurement records from
+            :func:`transformer_internals.cluster.collbench.run`, each with
+            ``bytes`` and ``median_s``.
+        ranks: World size the sweep ran at.
+        link: The link to price against.
+        op: Which collective the points are.
+
+    Returns:
+        One row per point: the measured time, the modelled time and their ratio.
+    """
+    timer = {
+        "all_reduce": all_reduce_time,
+        "all_gather": all_gather_time,
+        "reduce_scatter": all_gather_time,
+    }[op]
+    rows: list[dict[str, Any]] = []
+    for point in points:
+        modelled = timer(float(point["bytes"]), ranks, link)
+        measured = float(point["median_s"])
+        rows.append(
+            {
+                "op": op,
+                "bytes": point["bytes"],
+                "measured_s": measured,
+                "modelled_s": modelled,
+                "modelled_over_measured": modelled / measured if measured else float("nan"),
+            }
+        )
+    return rows
+
+
 def _eff_bw(link: Link, gpudirect: bool = True) -> float:
-    bw = link.gbytes_per_s * LINK_EFFICIENCY * 1e9
+    # A measured link already carries an achieved rate; applying the efficiency
+    # assumption to it as well would derate the same number twice.
+    factor = 1.0 if link.efficiency_applied else LINK_EFFICIENCY
+    bw = link.gbytes_per_s * factor * 1e9
     if link.inter_node and not gpudirect:
         bw /= GPUDIRECT_PENALTY[0]
     return bw

@@ -532,6 +532,141 @@ def test_measured_gloo_allreduce_fits_the_cost_model_form() -> None:
     assert fit["bandwidth_gbytes_per_s"] > 0
 
 
+# ------------------------------------------------- the collective benchmark
+
+
+def test_bus_bandwidth_uses_nccls_ring_factors():
+    """The factors are what make three different collectives comparable."""
+    from transformer_internals.cluster.collbench import bus_bandwidth
+
+    nbytes, seconds = 1_000_000.0, 0.001  # 1 GB/s algorithm bandwidth
+    # all-reduce moves 2(n-1)/n of the buffer per rank.
+    assert bus_bandwidth("all_reduce", nbytes, seconds, 4) == pytest.approx(1e9 * 1.5)
+    # all-gather and reduce-scatter move (n-1)/n.
+    assert bus_bandwidth("all_gather", nbytes, seconds, 4) == pytest.approx(1e9 * 0.75)
+    assert bus_bandwidth("reduce_scatter", nbytes, seconds, 4) == pytest.approx(1e9 * 0.75)
+    # One rank is not a collective.
+    assert bus_bandwidth("all_reduce", nbytes, seconds, 1) == 0.0
+
+
+def test_bus_bandwidth_is_flat_in_world_size_and_algorithm_bandwidth_is_not():
+    """The property that makes bus bandwidth the comparable one.
+
+    If every rank's link carries the same rate, the time for an all-reduce goes
+    as 2(n-1)/n, so algorithm bandwidth falls with the world size and bus
+    bandwidth stays put. That is why nccl-tests reports the second one.
+    """
+    from transformer_internals.cluster.collbench import bus_bandwidth
+
+    nbytes, link_rate = 1_000_000.0, 1e9
+    algorithm = []
+    bus = []
+    for n in (2, 4, 8):
+        seconds = 2 * (n - 1) / n * nbytes / link_rate
+        algorithm.append(nbytes / seconds)
+        bus.append(bus_bandwidth("all_reduce", nbytes, seconds, n))
+    assert all(b == pytest.approx(link_rate) for b in bus)
+    assert algorithm[0] > algorithm[-1]
+
+
+def test_a_measured_link_divides_the_fitted_latency_by_the_hop_count():
+    """Link.latency_us is per hop; a fit's intercept is the whole collective.
+
+    Getting this wrong overpredicts a small all-reduce by 2(n-1), which at eight
+    ranks is fourteen times, and only in the regime where latency is the only
+    thing that matters.
+    """
+    from transformer_internals.cluster.fabric import link_from_measurement
+
+    fit = {"bandwidth_gbytes_per_s": 100.0, "latency_us": 140.0, "r_squared": 0.999}
+    link = link_from_measurement("test", fit, ranks=8, op="all_reduce")
+    assert link.latency_us == pytest.approx(140.0 / 14)
+    gather = link_from_measurement("test", fit, ranks=8, op="all_gather")
+    assert gather.latency_us == pytest.approx(140.0 / 7)
+    assert link.measured is True
+    assert "MEASURED" in link.source
+
+
+def test_a_measured_link_is_not_derated_by_the_efficiency_assumption():
+    """A measurement is already an achieved rate; LINK_EFFICIENCY is for peaks."""
+    from transformer_internals.cluster.fabric import (
+        LINK_EFFICIENCY,
+        Link,
+        all_reduce_time,
+        link_from_measurement,
+    )
+
+    fit = {"bandwidth_gbytes_per_s": 100.0, "latency_us": 0.0, "r_squared": 1.0}
+    measured = link_from_measurement("m", fit, ranks=2, op="all_reduce")
+    published = Link("p", 100.0, 0.0, "datasheet", inter_node=False)
+    nbytes = 1e9
+    # The published link is derated; the measured one is not, so it is faster by
+    # exactly the efficiency factor.
+    ratio = all_reduce_time(nbytes, 2, published) / all_reduce_time(nbytes, 2, measured)
+    assert ratio == pytest.approx(1 / LINK_EFFICIENCY)
+
+
+@pytest.mark.slow
+def test_the_cost_model_tracks_a_real_collective_across_three_decades():
+    """The model's FORM, checked against a wire. Not its constants.
+
+    Fit the affine model to a real gloo all-reduce sweep, turn the fit into a
+    Link, then price every point in the sweep with it. This is not a held-out
+    prediction, since the model was fitted to these points; it is a check that
+    an affine model can describe a real collective at all, over a size range
+    where the cost goes from entirely latency to entirely bandwidth. A form that
+    could not do that would show a systematic drift across the range rather than
+    scatter.
+    """
+    from transformer_internals.cluster.collbench import run
+    from transformer_internals.cluster.fabric import link_from_measurement, predicted_vs_measured
+
+    ranks = 2
+    data = run(world_size=ranks, sizes=[1 << k for k in range(14, 23, 2)], iters=10)
+    fit = data["by_op"]["all_reduce"]["fit"]
+    link = link_from_measurement("gloo loopback", fit, ranks=ranks, op="all_reduce")
+    rows = predicted_vs_measured(data["by_op"]["all_reduce"]["points"], ranks, link)
+
+    print(f"\n[cost model] MEASURED gloo all-reduce, {ranks} ranks, CPU/loopback")
+    for row in rows:
+        print(
+            f"[cost model]   {row['bytes']:>12,} B  measured {row['measured_s'] * 1e3:>8.3f} ms  "
+            f"modelled {row['modelled_s'] * 1e3:>8.3f} ms  ratio {row['modelled_over_measured']:.2f}"
+        )
+    assert fit["r_squared"] > 0.9
+    # Generous, because this machine is shared and the smallest messages are
+    # scheduling noise. A wrong FORM would miss by far more than this.
+    for row in rows:
+        assert 0.4 < row["modelled_over_measured"] < 2.5, row
+
+
+@pytest.mark.slow
+def test_all_three_collectives_are_measured_and_ordered_as_the_ring_model_says():
+    """all-gather and reduce-scatter each move half an all-reduce's volume.
+
+    So at a given size their algorithm bandwidth should exceed the all-reduce's,
+    and their bus bandwidths should be closer together than their algorithm
+    bandwidths. gloo has no native ring reduce-scatter, so its reduce-scatter is
+    the slowest of the three; that is a gloo property and it is why the
+    assertion is on all-gather rather than on both.
+    """
+    from transformer_internals.cluster.collbench import OPS, run
+
+    data = run(world_size=2, sizes=[1 << 20, 1 << 22], iters=8, ops=OPS)
+    assert set(data["by_op"]) == set(OPS)
+    for op in OPS:
+        points = data["by_op"][op]["points"]
+        assert points
+        for point in points:
+            assert point["median_s"] > 0
+            assert point["bus_gbytes_per_s"] > 0
+    biggest = {op: data["by_op"][op]["points"][-1] for op in OPS}
+    assert (
+        biggest["all_gather"]["algorithm_gbytes_per_s"]
+        > biggest["all_reduce"]["algorithm_gbytes_per_s"]
+    )
+
+
 # -------------------------------------------------------------- cost model
 
 

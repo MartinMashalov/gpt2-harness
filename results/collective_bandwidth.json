@@ -1,0 +1,713 @@
+{
+  "status": "MEASURED on this machine",
+  "backend": "gloo",
+  "sweeps": {
+    "2": {
+      "world_size": 2,
+      "backend": "gloo",
+      "device": "cpu",
+      "points": [
+        {
+          "op": "all_reduce",
+          "numel": 4096,
+          "bytes": 16384,
+          "median_s": 0.00037654151674360037,
+          "min_s": 0.00033354200422763824,
+          "algorithm_gbytes_per_s": 0.04351180220893519,
+          "bus_gbytes_per_s": 0.04351180220893519,
+          "bus_gbytes_per_s_best": 0.04912124947482814
+        },
+        {
+          "op": "all_reduce",
+          "numel": 16384,
+          "bytes": 65536,
+          "median_s": 0.000390208006137982,
+          "min_s": 0.0003742919652722776,
+          "algorithm_gbytes_per_s": 0.16795144889166042,
+          "bus_gbytes_per_s": 0.16795144889166042,
+          "bus_gbytes_per_s_best": 0.17509325895447964
+        },
+        {
+          "op": "all_reduce",
+          "numel": 65536,
+          "bytes": 262144,
+          "median_s": 0.000499708519782871,
+          "min_s": 0.00045445800060406327,
+          "algorithm_gbytes_per_s": 0.5245938174396236,
+          "bus_gbytes_per_s": 0.5245938174396236,
+          "bus_gbytes_per_s_best": 0.5768277808984758
+        },
+        {
+          "op": "all_reduce",
+          "numel": 262144,
+          "bytes": 1048576,
+          "median_s": 0.0010425204818602651,
+          "min_s": 0.0010092500015161932,
+          "algorithm_gbytes_per_s": 1.0058085363742009,
+          "bus_gbytes_per_s": 1.0058085363742009,
+          "bus_gbytes_per_s_best": 1.0389655669306193
+        },
+        {
+          "op": "all_reduce",
+          "numel": 1048576,
+          "bytes": 4194304,
+          "median_s": 0.0018671244906727225,
+          "min_s": 0.00148583302507177,
+          "algorithm_gbytes_per_s": 2.246397613524312,
+          "bus_gbytes_per_s": 2.246397613524312,
+          "bus_gbytes_per_s_best": 2.822863625471915
+        },
+        {
+          "op": "all_reduce",
+          "numel": 4194304,
+          "bytes": 16777216,
+          "median_s": 0.006241833005333319,
+          "min_s": 0.00608870800351724,
+          "algorithm_gbytes_per_s": 2.6878668470727667,
+          "bus_gbytes_per_s": 2.6878668470727667,
+          "bus_gbytes_per_s_best": 2.755464047595708
+        }
+      ],
+      "by_op": {
+        "all_reduce": {
+          "points": [
+            {
+              "op": "all_reduce",
+              "numel": 4096,
+              "bytes": 16384,
+              "median_s": 0.00037654151674360037,
+              "min_s": 0.00033354200422763824,
+              "algorithm_gbytes_per_s": 0.04351180220893519,
+              "bus_gbytes_per_s": 0.04351180220893519,
+              "bus_gbytes_per_s_best": 0.04912124947482814
+            },
+            {
+              "op": "all_reduce",
+              "numel": 16384,
+              "bytes": 65536,
+              "median_s": 0.000390208006137982,
+              "min_s": 0.0003742919652722776,
+              "algorithm_gbytes_per_s": 0.16795144889166042,
+              "bus_gbytes_per_s": 0.16795144889166042,
+              "bus_gbytes_per_s_best": 0.17509325895447964
+            },
+            {
+              "op": "all_reduce",
+              "numel": 65536,
+              "bytes": 262144,
+              "median_s": 0.000499708519782871,
+              "min_s": 0.00045445800060406327,
+              "algorithm_gbytes_per_s": 0.5245938174396236,
+              "bus_gbytes_per_s": 0.5245938174396236,
+              "bus_gbytes_per_s_best": 0.5768277808984758
+            },
+            {
+              "op": "all_reduce",
+              "numel": 262144,
+              "bytes": 1048576,
+              "median_s": 0.0010425204818602651,
+              "min_s": 0.0010092500015161932,
+              "algorithm_gbytes_per_s": 1.0058085363742009,
+              "bus_gbytes_per_s": 1.0058085363742009,
+              "bus_gbytes_per_s_best": 1.0389655669306193
+            },
+            {
+              "op": "all_reduce",
+              "numel": 1048576,
+              "bytes": 4194304,
+              "median_s": 0.0018671244906727225,
+              "min_s": 0.00148583302507177,
+              "algorithm_gbytes_per_s": 2.246397613524312,
+              "bus_gbytes_per_s": 2.246397613524312,
+              "bus_gbytes_per_s_best": 2.822863625471915
+            },
+            {
+              "op": "all_reduce",
+              "numel": 4194304,
+              "bytes": 16777216,
+              "median_s": 0.006241833005333319,
+              "min_s": 0.00608870800351724,
+              "algorithm_gbytes_per_s": 2.6878668470727667,
+              "bus_gbytes_per_s": 2.6878668470727667,
+              "bus_gbytes_per_s_best": 2.755464047595708
+            }
+          ],
+          "peak_bus_gbytes_per_s": 2.6878668470727667,
+          "fit": {
+            "op": "all_reduce",
+            "latency_us": 447.7619776574,
+            "bandwidth_gbytes_per_s": 2.8926538128117074,
+            "r_squared": 0.9973542459770901,
+            "slope_s_per_byte": 3.457033107698371e-10,
+            "intercept_s": 0.0004477619776574
+          }
+        },
+        "all_gather": {
+          "points": [
+            {
+              "op": "all_gather",
+              "numel": 4096,
+              "bytes": 16384,
+              "median_s": 0.0003340205003041774,
+              "min_s": 0.00021808297606185079,
+              "algorithm_gbytes_per_s": 0.04905088156289758,
+              "bus_gbytes_per_s": 0.02452544078144879,
+              "bus_gbytes_per_s_best": 0.03756368400657122
+            },
+            {
+              "op": "all_gather",
+              "numel": 16384,
+              "bytes": 65536,
+              "median_s": 0.0002295629819855094,
+              "min_s": 0.00016066600801423192,
+              "algorithm_gbytes_per_s": 0.28548156777357425,
+              "bus_gbytes_per_s": 0.14274078388678713,
+              "bus_gbytes_per_s_best": 0.20395104356546523
+            },
+            {
+              "op": "all_gather",
+              "numel": 65536,
+              "bytes": 262144,
+              "median_s": 0.0002452500048093498,
+              "min_s": 0.00019829097436740994,
+              "algorithm_gbytes_per_s": 1.0688847904561025,
+              "bus_gbytes_per_s": 0.5344423952280513,
+              "bus_gbytes_per_s_best": 0.6610084015076699
+            },
+            {
+              "op": "all_gather",
+              "numel": 262144,
+              "bytes": 1048576,
+              "median_s": 0.0005439375236164778,
+              "min_s": 0.00047745800111442804,
+              "algorithm_gbytes_per_s": 1.9277508067991558,
+              "bus_gbytes_per_s": 0.9638754033995779,
+              "bus_gbytes_per_s_best": 1.0980819229676049
+            },
+            {
+              "op": "all_gather",
+              "numel": 1048576,
+              "bytes": 4194304,
+              "median_s": 0.0017816870240494609,
+              "min_s": 0.0013547079870477319,
+              "algorithm_gbytes_per_s": 2.3541194067109976,
+              "bus_gbytes_per_s": 1.1770597033554988,
+              "bus_gbytes_per_s_best": 1.548047269264464
+            },
+            {
+              "op": "all_gather",
+              "numel": 4194304,
+              "bytes": 16777216,
+              "median_s": 0.00439372900291346,
+              "min_s": 0.003913833003025502,
+              "algorithm_gbytes_per_s": 3.8184457869101873,
+              "bus_gbytes_per_s": 1.9092228934550937,
+              "bus_gbytes_per_s_best": 2.143322924998428
+            }
+          ],
+          "peak_bus_gbytes_per_s": 1.9092228934550937,
+          "fit": {
+            "op": "all_gather",
+            "latency_us": 330.38176705440526,
+            "bandwidth_gbytes_per_s": 2.0162799883388485,
+            "r_squared": 0.9839961414868672,
+            "slope_s_per_byte": 2.479814325846356e-10,
+            "intercept_s": 0.00033038176705440527
+          }
+        },
+        "reduce_scatter": {
+          "points": [
+            {
+              "op": "reduce_scatter",
+              "numel": 4096,
+              "bytes": 16384,
+              "median_s": 0.00033008347963914275,
+              "min_s": 0.00027895800303667784,
+              "algorithm_gbytes_per_s": 0.04963592851696633,
+              "bus_gbytes_per_s": 0.024817964258483163,
+              "bus_gbytes_per_s_best": 0.02936642760137232
+            },
+            {
+              "op": "reduce_scatter",
+              "numel": 16384,
+              "bytes": 65536,
+              "median_s": 0.0003669789875857532,
+              "min_s": 0.0002870000316761434,
+              "algorithm_gbytes_per_s": 0.17858243173850924,
+              "bus_gbytes_per_s": 0.08929121586925462,
+              "bus_gbytes_per_s_best": 0.11417420342648626
+            },
+            {
+              "op": "reduce_scatter",
+              "numel": 65536,
+              "bytes": 262144,
+              "median_s": 0.0004246665339451283,
+              "min_s": 0.0003845419851131737,
+              "algorithm_gbytes_per_s": 0.6172937565027715,
+              "bus_gbytes_per_s": 0.30864687825138576,
+              "bus_gbytes_per_s_best": 0.3408522478018219
+            },
+            {
+              "op": "reduce_scatter",
+              "numel": 262144,
+              "bytes": 1048576,
+              "median_s": 0.0008093960059341043,
+              "min_s": 0.0007083750097081065,
+              "algorithm_gbytes_per_s": 1.2955042924753055,
+              "bus_gbytes_per_s": 0.6477521462376528,
+              "bus_gbytes_per_s_best": 0.7401277470474833
+            },
+            {
+              "op": "reduce_scatter",
+              "numel": 1048576,
+              "bytes": 4194304,
+              "median_s": 0.002043229527771473,
+              "min_s": 0.0017648329958319664,
+              "algorithm_gbytes_per_s": 2.05278161018683,
+              "bus_gbytes_per_s": 1.026390805093415,
+              "bus_gbytes_per_s_best": 1.1883005388911452
+            },
+            {
+              "op": "reduce_scatter",
+              "numel": 4194304,
+              "bytes": 16777216,
+              "median_s": 0.007534541509812698,
+              "min_s": 0.007208583003375679,
+              "algorithm_gbytes_per_s": 2.226706957304568,
+              "bus_gbytes_per_s": 1.113353478652284,
+              "bus_gbytes_per_s_best": 1.1636972198380362
+            }
+          ],
+          "peak_bus_gbytes_per_s": 1.113353478652284,
+          "fit": {
+            "op": "reduce_scatter",
+            "latency_us": 318.6231191944038,
+            "bandwidth_gbytes_per_s": 1.1651450128469534,
+            "r_squared": 0.9997979728976996,
+            "slope_s_per_byte": 4.291311334528941e-10,
+            "intercept_s": 0.0003186231191944038
+          }
+        }
+      },
+      "ops": [
+        "all_reduce",
+        "all_gather",
+        "reduce_scatter"
+      ],
+      "fit": {
+        "op": "all_reduce",
+        "latency_us": 447.7619776574,
+        "bandwidth_gbytes_per_s": 2.8926538128117074,
+        "r_squared": 0.9973542459770901,
+        "slope_s_per_byte": 3.457033107698371e-10,
+        "intercept_s": 0.0004477619776574
+      },
+      "measurement_note": "MEASURED on this machine over gloo, device cpu. Bus bandwidth follows NCCL's convention: algorithm bandwidth times the ring factor for the collective, so the three collectives are comparable with each other and across world sizes."
+    },
+    "4": {
+      "world_size": 4,
+      "backend": "gloo",
+      "device": "cpu",
+      "points": [
+        {
+          "op": "all_reduce",
+          "numel": 4096,
+          "bytes": 16384,
+          "median_s": 0.0009887295018415898,
+          "min_s": 0.0008917090017348528,
+          "algorithm_gbytes_per_s": 0.01657076072827144,
+          "bus_gbytes_per_s": 0.02485614109240716,
+          "bus_gbytes_per_s_best": 0.02756056062256463
+        },
+        {
+          "op": "all_reduce",
+          "numel": 16384,
+          "bytes": 65536,
+          "median_s": 0.0009758960222825408,
+          "min_s": 0.000851707998663187,
+          "algorithm_gbytes_per_s": 0.06715469527861859,
+          "bus_gbytes_per_s": 0.1007320429179279,
+          "bus_gbytes_per_s_best": 0.11541983890522894
+        },
+        {
+          "op": "all_reduce",
+          "numel": 65536,
+          "bytes": 262144,
+          "median_s": 0.0010943539964500815,
+          "min_s": 0.0010249590268358588,
+          "algorithm_gbytes_per_s": 0.23954223299805677,
+          "bus_gbytes_per_s": 0.35931334949708515,
+          "bus_gbytes_per_s_best": 0.38364070143749385
+        },
+        {
+          "op": "all_reduce",
+          "numel": 262144,
+          "bytes": 1048576,
+          "median_s": 0.0017011459858622402,
+          "min_s": 0.0015939159784466028,
+          "algorithm_gbytes_per_s": 0.6163938948887566,
+          "bus_gbytes_per_s": 0.9245908423331349,
+          "bus_gbytes_per_s_best": 0.986792290979403
+        },
+        {
+          "op": "all_reduce",
+          "numel": 1048576,
+          "bytes": 4194304,
+          "median_s": 0.0037856874987483025,
+          "min_s": 0.003660332993604243,
+          "algorithm_gbytes_per_s": 1.107937198035179,
+          "bus_gbytes_per_s": 1.6619057970527686,
+          "bus_gbytes_per_s_best": 1.7188206676805524
+        },
+        {
+          "op": "all_reduce",
+          "numel": 4194304,
+          "bytes": 16777216,
+          "median_s": 0.013062083016848192,
+          "min_s": 0.012193124974146485,
+          "algorithm_gbytes_per_s": 1.2844211737408058,
+          "bus_gbytes_per_s": 1.9266317606112089,
+          "bus_gbytes_per_s_best": 2.0639355418204923
+        }
+      ],
+      "by_op": {
+        "all_reduce": {
+          "points": [
+            {
+              "op": "all_reduce",
+              "numel": 4096,
+              "bytes": 16384,
+              "median_s": 0.0009887295018415898,
+              "min_s": 0.0008917090017348528,
+              "algorithm_gbytes_per_s": 0.01657076072827144,
+              "bus_gbytes_per_s": 0.02485614109240716,
+              "bus_gbytes_per_s_best": 0.02756056062256463
+            },
+            {
+              "op": "all_reduce",
+              "numel": 16384,
+              "bytes": 65536,
+              "median_s": 0.0009758960222825408,
+              "min_s": 0.000851707998663187,
+              "algorithm_gbytes_per_s": 0.06715469527861859,
+              "bus_gbytes_per_s": 0.1007320429179279,
+              "bus_gbytes_per_s_best": 0.11541983890522894
+            },
+            {
+              "op": "all_reduce",
+              "numel": 65536,
+              "bytes": 262144,
+              "median_s": 0.0010943539964500815,
+              "min_s": 0.0010249590268358588,
+              "algorithm_gbytes_per_s": 0.23954223299805677,
+              "bus_gbytes_per_s": 0.35931334949708515,
+              "bus_gbytes_per_s_best": 0.38364070143749385
+            },
+            {
+              "op": "all_reduce",
+              "numel": 262144,
+              "bytes": 1048576,
+              "median_s": 0.0017011459858622402,
+              "min_s": 0.0015939159784466028,
+              "algorithm_gbytes_per_s": 0.6163938948887566,
+              "bus_gbytes_per_s": 0.9245908423331349,
+              "bus_gbytes_per_s_best": 0.986792290979403
+            },
+            {
+              "op": "all_reduce",
+              "numel": 1048576,
+              "bytes": 4194304,
+              "median_s": 0.0037856874987483025,
+              "min_s": 0.003660332993604243,
+              "algorithm_gbytes_per_s": 1.107937198035179,
+              "bus_gbytes_per_s": 1.6619057970527686,
+              "bus_gbytes_per_s_best": 1.7188206676805524
+            },
+            {
+              "op": "all_reduce",
+              "numel": 4194304,
+              "bytes": 16777216,
+              "median_s": 0.013062083016848192,
+              "min_s": 0.012193124974146485,
+              "algorithm_gbytes_per_s": 1.2844211737408058,
+              "bus_gbytes_per_s": 1.9266317606112089,
+              "bus_gbytes_per_s_best": 2.0639355418204923
+            }
+          ],
+          "peak_bus_gbytes_per_s": 1.9266317606112089,
+          "fit": {
+            "op": "all_reduce",
+            "latency_us": 909.366917523323,
+            "bandwidth_gbytes_per_s": 2.0769486424420722,
+            "r_squared": 0.9997278177015161,
+            "slope_s_per_byte": 7.222133322643466e-10,
+            "intercept_s": 0.0009093669175233229
+          }
+        },
+        "all_gather": {
+          "points": [
+            {
+              "op": "all_gather",
+              "numel": 4096,
+              "bytes": 16384,
+              "median_s": 0.0005378750211093575,
+              "min_s": 0.00045666698133572936,
+              "algorithm_gbytes_per_s": 0.0304606076820751,
+              "bus_gbytes_per_s": 0.022845455761556322,
+              "bus_gbytes_per_s_best": 0.026908010655944906
+            },
+            {
+              "op": "all_gather",
+              "numel": 16384,
+              "bytes": 65536,
+              "median_s": 0.000545457995031029,
+              "min_s": 0.00046029099030420184,
+              "algorithm_gbytes_per_s": 0.120148573486895,
+              "bus_gbytes_per_s": 0.09011143011517125,
+              "bus_gbytes_per_s_best": 0.10678462328258027
+            },
+            {
+              "op": "all_gather",
+              "numel": 65536,
+              "bytes": 262144,
+              "median_s": 0.0005794165190309286,
+              "min_s": 0.0005132919759489596,
+              "algorithm_gbytes_per_s": 0.45242755667103624,
+              "bus_gbytes_per_s": 0.33932066750327716,
+              "bus_gbytes_per_s_best": 0.38303345700371944
+            },
+            {
+              "op": "all_gather",
+              "numel": 262144,
+              "bytes": 1048576,
+              "median_s": 0.0010246460151392967,
+              "min_s": 0.0009681250085122883,
+              "algorithm_gbytes_per_s": 1.023354392158008,
+              "bus_gbytes_per_s": 0.7675157941185059,
+              "bus_gbytes_per_s_best": 0.8123248476025892
+            },
+            {
+              "op": "all_gather",
+              "numel": 1048576,
+              "bytes": 4194304,
+              "median_s": 0.0031142499938141555,
+              "min_s": 0.0026269580121152103,
+              "algorithm_gbytes_per_s": 1.3468103101328277,
+              "bus_gbytes_per_s": 1.0101077325996208,
+              "bus_gbytes_per_s_best": 1.1974793603446594
+            },
+            {
+              "op": "all_gather",
+              "numel": 4194304,
+              "bytes": 16777216,
+              "median_s": 0.0083843955071643,
+              "min_s": 0.007640915981028229,
+              "algorithm_gbytes_per_s": 2.001004841155716,
+              "bus_gbytes_per_s": 1.5007536308667873,
+              "bus_gbytes_per_s_best": 1.646780573329473
+            }
+          ],
+          "peak_bus_gbytes_per_s": 1.5007536308667873,
+          "fit": {
+            "op": "all_gather",
+            "latency_us": 609.2260301286676,
+            "bandwidth_gbytes_per_s": 1.5927852942366543,
+            "r_squared": 0.9929517896570328,
+            "slope_s_per_byte": 4.708732575029449e-10,
+            "intercept_s": 0.0006092260301286676
+          }
+        },
+        "reduce_scatter": {
+          "points": [
+            {
+              "op": "reduce_scatter",
+              "numel": 4096,
+              "bytes": 16384,
+              "median_s": 0.001169958501122892,
+              "min_s": 0.0010919999913312495,
+              "algorithm_gbytes_per_s": 0.01400391551005879,
+              "bus_gbytes_per_s": 0.010502936632544093,
+              "bus_gbytes_per_s_best": 0.011252747342076245
+            },
+            {
+              "op": "reduce_scatter",
+              "numel": 16384,
+              "bytes": 65536,
+              "median_s": 0.00124368752585724,
+              "min_s": 0.0010290000354871154,
+              "algorithm_gbytes_per_s": 0.05269490819635569,
+              "bus_gbytes_per_s": 0.039521181147266764,
+              "bus_gbytes_per_s_best": 0.04776676220106453
+            },
+            {
+              "op": "reduce_scatter",
+              "numel": 65536,
+              "bytes": 262144,
+              "median_s": 0.0013261459826026112,
+              "min_s": 0.0012635000166483223,
+              "algorithm_gbytes_per_s": 0.19767356191475433,
+              "bus_gbytes_per_s": 0.14825517143606573,
+              "bus_gbytes_per_s_best": 0.1556058546968133
+            },
+            {
+              "op": "reduce_scatter",
+              "numel": 262144,
+              "bytes": 1048576,
+              "median_s": 0.002013667020946741,
+              "min_s": 0.0018640829948708415,
+              "algorithm_gbytes_per_s": 0.5207295889004548,
+              "bus_gbytes_per_s": 0.39054719167534113,
+              "bus_gbytes_per_s_best": 0.4218867948283012
+            },
+            {
+              "op": "reduce_scatter",
+              "numel": 1048576,
+              "bytes": 4194304,
+              "median_s": 0.004513458494329825,
+              "min_s": 0.00432662497041747,
+              "algorithm_gbytes_per_s": 0.9292882620432262,
+              "bus_gbytes_per_s": 0.6969661965324196,
+              "bus_gbytes_per_s_best": 0.7270627848515544
+            },
+            {
+              "op": "reduce_scatter",
+              "numel": 4194304,
+              "bytes": 16777216,
+              "median_s": 0.015090103959664702,
+              "min_s": 0.014389124989975244,
+              "algorithm_gbytes_per_s": 1.111802545883374,
+              "bus_gbytes_per_s": 0.8338519094125304,
+              "bus_gbytes_per_s_best": 0.8744737438007097
+            }
+          ],
+          "peak_bus_gbytes_per_s": 0.8338519094125304,
+          "fit": {
+            "op": "reduce_scatter",
+            "latency_us": 1130.1441238686432,
+            "bandwidth_gbytes_per_s": 0.9029381175869217,
+            "r_squared": 0.9998962807210603,
+            "slope_s_per_byte": 8.306217063959546e-10,
+            "intercept_s": 0.0011301441238686432
+          }
+        }
+      },
+      "ops": [
+        "all_reduce",
+        "all_gather",
+        "reduce_scatter"
+      ],
+      "fit": {
+        "op": "all_reduce",
+        "latency_us": 909.366917523323,
+        "bandwidth_gbytes_per_s": 2.0769486424420722,
+        "r_squared": 0.9997278177015161,
+        "slope_s_per_byte": 7.222133322643466e-10,
+        "intercept_s": 0.0009093669175233229
+      },
+      "measurement_note": "MEASURED on this machine over gloo, device cpu. Bus bandwidth follows NCCL's convention: algorithm bandwidth times the ring factor for the collective, so the three collectives are comparable with each other and across world sizes."
+    }
+  },
+  "fitted_link": {
+    "name": "gloo on cpu, 4 ranks",
+    "gbytes_per_s": 2.0769486424420722,
+    "latency_us": 151.56115292055384,
+    "source": "MEASURED by transformer_internals.cluster.collbench, all_reduce at 4 ranks. Fitted t = 909.4us + bytes/2.08 GB/s, R^2 = 0.9997, peak bus 1.93 GB/s. Latency divided by 6 ring hops to give the per-hop figure this model uses. world size 4, 8 timed calls per point",
+    "measured": true
+  },
+  "model_vs_measurement": {
+    "note": "The model was fitted to these same points, so this is a goodness-of-form check and not a held-out prediction. The reading that matters is where the ratio departs from 1: an affine model should track the bandwidth-bound points closely and should be worst at the smallest messages, where the real cost is scheduling rather than latency or bandwidth.",
+    "rows": [
+      {
+        "op": "all_reduce",
+        "bytes": 16384,
+        "measured_s": 0.0009887295018415898,
+        "modelled_s": 0.000921199660759142,
+        "modelled_over_measured": 0.9317003882693214
+      },
+      {
+        "op": "all_reduce",
+        "bytes": 65536,
+        "measured_s": 0.0009758960222825408,
+        "modelled_s": 0.0009566978904665992,
+        "modelled_over_measured": 0.9803276871945448
+      },
+      {
+        "op": "all_reduce",
+        "bytes": 262144,
+        "measured_s": 0.0010943539964500815,
+        "modelled_s": 0.0010986908092964279,
+        "modelled_over_measured": 1.0039628976185169
+      },
+      {
+        "op": "all_reduce",
+        "bytes": 1048576,
+        "measured_s": 0.0017011459858622402,
+        "modelled_s": 0.0016666624846157425,
+        "modelled_over_measured": 0.9797292522022915
+      },
+      {
+        "op": "all_reduce",
+        "bytes": 4194304,
+        "measured_s": 0.0037856874987483025,
+        "modelled_s": 0.003938549185893001,
+        "modelled_over_measured": 1.0403788445811337
+      },
+      {
+        "op": "all_reduce",
+        "bytes": 16777216,
+        "measured_s": 0.013062083016848192,
+        "modelled_s": 0.013026095991002035,
+        "modelled_over_measured": 0.9972449244274639
+      }
+    ]
+  },
+  "bus_bandwidth_convention": "algorithm bandwidth times the ring factor: 2(n-1)/n for all-reduce, (n-1)/n for all-gather and reduce-scatter, with the size taken as the full unsharded buffer in all three cases. This is NCCL's own convention, so the numbers are comparable with nccl-tests.",
+  "environment": {
+    "source": "detected",
+    "accelerator": "mps",
+    "cuda_available": false,
+    "device_count": 0,
+    "device_names": [],
+    "compute_capabilities": [],
+    "total_memory_bytes": [],
+    "bf16_supported": false,
+    "nccl_available": false,
+    "nccl_version": null,
+    "gloo_available": true,
+    "mps_available": true,
+    "driver_version": null,
+    "cuda_runtime_version": null,
+    "torch_version": "2.2.2",
+    "platform": "macOS-10.16-x86_64-i386-64bit",
+    "notes": [],
+    "env": {},
+    "nvlink_topology": null
+  },
+  "meta": {
+    "torch": "2.2.2",
+    "python": "3.12.9",
+    "platform": "macOS-10.16-x86_64-i386-64bit",
+    "world_sizes": [
+      2,
+      4
+    ],
+    "element_counts": [
+      4096,
+      16384,
+      65536,
+      262144,
+      1048576,
+      4194304
+    ],
+    "iterations_per_point": 8,
+    "runtime_seconds": 6.37723970413208
+  },
+  "datasheet_comparison": {
+    "link": "nvlink4",
+    "published_gbytes_per_s": 450.0,
+    "published_source": "NVIDIA H100 datasheet: 18 NVLink 4 links x 25 GB/s per direction = 900 GB/s bidirectional aggregate per GPU; NVSwitch gives every GPU in the 8-GPU node that bandwidth all-to-all.",
+    "measured_gbytes_per_s": 2.0769486424420722,
+    "measured_over_published": 0.0046154414276490495,
+    "note": "Only meaningful when the measurement ran on hardware that has a nvlink4 link. On a CPU machine the measured figure is loopback TCP and the ratio means nothing."
+  }
+}
