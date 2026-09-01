@@ -160,6 +160,40 @@ def test_a_storage_saved_by_several_tensors_is_charged_once():
     assert charged <= 64 * 64 * 4
 
 
+def test_the_meter_tracks_live_memory_and_not_cumulative_traffic():
+    """The backward pass releases the graph, and the meter must see that.
+
+    Without the weakref release the number would be cumulative bytes ever
+    saved, which is a different quantity and would look plausible while being
+    wrong for every schedule that frees as it goes, 1F1B included.
+    """
+    import gc
+
+    cfg = _config()
+    torch.manual_seed(0)
+    model = GPT(cfg).train()
+    x = torch.randint(0, cfg.vocab_size, (4, 32))
+    y = torch.randint(0, cfg.vocab_size, (4, 32))
+
+    meter = ActivationMeter(exclude=[*model.parameters(), *model.buffers()])
+    with meter:
+        out = model(x, targets=y)
+    at_peak = meter.stash_bytes()
+    storages_at_peak = len(meter._live)
+
+    out["loss"].backward()
+    del out
+    gc.collect()
+
+    assert at_peak > 0
+    assert storages_at_peak > 10
+    # Almost everything the graph held is gone.
+    assert meter.stash_bytes() < 0.05 * at_peak
+    assert len(meter._live) < storages_at_peak / 10
+    # And the high-water mark is not retroactively lowered by the release.
+    assert meter.peak_bytes == at_peak
+
+
 def test_the_peak_is_read_before_the_backward_frees_it():
     cfg = _config()
     report = _measure(cfg)
