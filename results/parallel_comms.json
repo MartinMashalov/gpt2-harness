@@ -414,6 +414,7 @@
         "decay_mask": 0,
         "total": 912384
       },
+      "activation_bytes_per_rank": 1040004,
       "shard_numel": 28512,
       "n_params": 57024
     },
@@ -433,8 +434,31 @@
         "decay_mask": 0,
         "total": 912384
       },
+      "activation_bytes_per_rank": 1040004,
       "shard_numel": 28512,
       "n_params": 57024
+    },
+    "data_parallel": {
+      "sharded_bytes_per_rank": {
+        "params": 228096,
+        "grads": 228096,
+        "optimizer": 456192,
+        "decay_mask": 0,
+        "total": 912384
+      },
+      "replicated_bytes_per_rank": {
+        "params": 228096,
+        "grads": 228096,
+        "optimizer": 456192,
+        "decay_mask": 0,
+        "total": 912384
+      },
+      "activation_bytes_per_rank": 1040004,
+      "n_params": 57024
+    },
+    "single_process_reference": {
+      "activation_bytes_per_rank": 2076804,
+      "note": "one process holding the whole batch. Every per-rank activation figure above should be read against this: data parallelism and ZeRO reduce it only because each rank sees 1/p of the batch, and neither shards an activation."
     },
     "zero_3": {
       "sharded_bytes_per_rank": {
@@ -451,6 +475,8 @@
         "decay_mask": 0,
         "total": 912384
       },
+      "activation_bytes_per_rank": 84612,
+      "activation_note": "forward stash only; ZeRO-3 here recomputes each unit in the backward pass, so one unit's activations are live again then",
       "n_params": 57024,
       "n_block_params": 50816,
       "units": 4,
@@ -460,6 +486,43 @@
         6352,
         6352
       ]
+    },
+    "tensor_parallel_block": {
+      "activation_bytes_per_rank": 103824,
+      "reference_activation_bytes": 182160,
+      "local_params": 6448,
+      "reference_params": 12704,
+      "note": "one block, same batch on every rank. Unlike ZeRO this genuinely shards activations: the 4C MLP hidden and the per-head attention tensors are 1/p of the width. The residual stream and the LayerNorm inputs stay replicated, which is why the ratio is above 1/p."
+    },
+    "pipeline_gpipe": {
+      "activation_peak_bytes_per_rank": [
+        496128,
+        494592,
+        494592,
+        594960
+      ],
+      "peak_stash_micro_batches": [
+        4,
+        4,
+        4,
+        4
+      ],
+      "note": "peak over the whole step, per stage. Pipeline parallelism shards activations by depth, and the schedule decides how many micro-batches of them are alive at once."
+    },
+    "pipeline_1f1b": {
+      "activation_peak_bytes_per_rank": [
+        496128,
+        375040,
+        255488,
+        153604
+      ],
+      "peak_stash_micro_batches": [
+        4,
+        3,
+        2,
+        1
+      ],
+      "note": "peak over the whole step, per stage. Pipeline parallelism shards activations by depth, and the schedule decides how many micro-batches of them are alive at once."
     }
   },
   "mixed_precision": {
@@ -745,10 +808,10 @@
         "micro_batches": 1,
         "micro_batch_size": 16,
         "analytic_bubble": 0.75,
-        "measured_bubble": 0.7517271119099286,
-        "makespan_seconds": 0.8060903750010766,
-        "compute_seconds_all_ranks": 0.800521541852504,
-        "comm_seconds_all_ranks": 1.7469548759399913,
+        "measured_bubble": 0.7515538730467334,
+        "makespan_seconds": 0.8006672500050627,
+        "compute_seconds_all_ranks": 0.7956907089683227,
+        "comm_seconds_all_ranks": 1.7031317930668592,
         "peak_stash": 1
       },
       {
@@ -756,10 +819,10 @@
         "micro_batches": 2,
         "micro_batch_size": 8,
         "analytic_bubble": 0.6,
-        "measured_bubble": 0.6071668420505676,
-        "makespan_seconds": 0.5012534590205178,
-        "compute_seconds_all_ranks": 0.7876359169604257,
-        "comm_seconds_all_ranks": 0.8674728740588762,
+        "measured_bubble": 0.6054158670956618,
+        "makespan_seconds": 0.49071370804449543,
+        "compute_seconds_all_ranks": 0.7745113719720393,
+        "comm_seconds_all_ranks": 0.8475221220287494,
         "peak_stash": 2
       },
       {
@@ -767,10 +830,10 @@
         "micro_batches": 4,
         "micro_batch_size": 4,
         "analytic_bubble": 0.42857142857142855,
-        "measured_bubble": 0.4364715788009905,
-        "makespan_seconds": 0.3501895419904031,
-        "compute_seconds_all_ranks": 0.7893670388730243,
-        "comm_seconds_all_ranks": 0.4403185879345983,
+        "measured_bubble": 0.4461437578982159,
+        "makespan_seconds": 0.3599052909994498,
+        "compute_seconds_all_ranks": 0.7973431679420173,
+        "comm_seconds_all_ranks": 0.4612058352213353,
         "peak_stash": 4
       },
       {
@@ -778,10 +841,10 @@
         "micro_batches": 8,
         "micro_batch_size": 2,
         "analytic_bubble": 0.2727272727272727,
-        "measured_bubble": 0.2940744302855445,
-        "makespan_seconds": 0.2923714169883169,
-        "compute_seconds_all_ranks": 0.825569836422801,
-        "comm_seconds_all_ranks": 0.250985121820122,
+        "measured_bubble": 0.30633508285843947,
+        "makespan_seconds": 0.30572904204018414,
+        "compute_seconds_all_ranks": 0.8482940424582921,
+        "comm_seconds_all_ranks": 0.2680271254503168,
         "peak_stash": 8
       },
       {
@@ -789,10 +852,10 @@
         "micro_batches": 16,
         "micro_batch_size": 1,
         "analytic_bubble": 0.15789473684210525,
-        "measured_bubble": 0.20037865146693912,
-        "makespan_seconds": 0.28210054099326953,
-        "compute_seconds_all_ranks": 0.9022944600437768,
-        "comm_seconds_all_ranks": 0.16592120315181091,
+        "measured_bubble": 0.21503298159071615,
+        "makespan_seconds": 0.28955108305672184,
+        "compute_seconds_all_ranks": 0.9091522013768554,
+        "comm_seconds_all_ranks": 0.18470799725037068,
         "peak_stash": 16
       },
       {
@@ -800,10 +863,10 @@
         "micro_batches": 1,
         "micro_batch_size": 16,
         "analytic_bubble": 0.75,
-        "measured_bubble": 0.7513834405986229,
-        "makespan_seconds": 0.8184382920153439,
-        "compute_seconds_all_ranks": 0.8139092489727773,
-        "comm_seconds_all_ranks": 1.7109372489503585,
+        "measured_bubble": 0.7516122455469967,
+        "makespan_seconds": 0.7702894579852,
+        "compute_seconds_all_ranks": 0.7653218749910593,
+        "comm_seconds_all_ranks": 1.6388000810402445,
         "peak_stash": 1
       },
       {
@@ -811,10 +874,10 @@
         "micro_batches": 2,
         "micro_batch_size": 8,
         "analytic_bubble": 0.6,
-        "measured_bubble": 0.603708207330785,
-        "makespan_seconds": 0.5127993330243044,
-        "compute_seconds_all_ranks": 0.8128726678551175,
-        "comm_seconds_all_ranks": 0.8766636638902128,
+        "measured_bubble": 0.6072406719845185,
+        "makespan_seconds": 0.4922856250195764,
+        "compute_seconds_all_ranks": 0.7733990850974806,
+        "comm_seconds_all_ranks": 0.8506897519691847,
         "peak_stash": 2
       },
       {
@@ -822,10 +885,10 @@
         "micro_batches": 4,
         "micro_batch_size": 4,
         "analytic_bubble": 0.42857142857142855,
-        "measured_bubble": 0.43835959080268927,
-        "makespan_seconds": 0.34752179199131206,
-        "compute_seconds_all_ranks": 0.7807291258359328,
-        "comm_seconds_all_ranks": 0.44046766491374,
+        "measured_bubble": 0.4482372407443451,
+        "makespan_seconds": 0.35844887496205047,
+        "compute_seconds_all_ranks": 0.7911149612045847,
+        "comm_seconds_all_ranks": 0.46395333315012977,
         "peak_stash": 4
       },
       {
@@ -833,10 +896,10 @@
         "micro_batches": 8,
         "micro_batch_size": 2,
         "analytic_bubble": 0.2727272727272727,
-        "measured_bubble": 0.2954789870397836,
-        "makespan_seconds": 0.2942185419960879,
-        "compute_seconds_all_ranks": 0.8291325809550472,
-        "comm_seconds_all_ranks": 0.2526958312955685,
+        "measured_bubble": 0.3073333723855318,
+        "makespan_seconds": 0.3013809589901939,
+        "compute_seconds_all_ranks": 0.8350261299638078,
+        "comm_seconds_all_ranks": 0.27018650074023753,
         "peak_stash": 4
       },
       {
@@ -844,10 +907,10 @@
         "micro_batches": 16,
         "micro_batch_size": 1,
         "analytic_bubble": 0.15789473684210525,
-        "measured_bubble": 0.1954621323892216,
-        "makespan_seconds": 0.281907707976643,
-        "compute_seconds_all_ranks": 0.9072217049542814,
-        "comm_seconds_all_ranks": 0.16184908209834248,
+        "measured_bubble": 0.2146104216068262,
+        "makespan_seconds": 0.3046851250110194,
+        "compute_seconds_all_ranks": 0.957186087500304,
+        "comm_seconds_all_ranks": 0.18814050080254674,
         "peak_stash": 4
       }
     ],
@@ -1217,6 +1280,6 @@
       "repeats": 3
     },
     "measured_vs_modelled": "equivalence errors, collective counts, payload bytes, resident bytes and the bubble scan are MEASURED on this machine. wire_bytes_ring_model and projection_gpt2_124m are MODELLED from the formulas printed beside them.",
-    "runtime_seconds": 103.79200506210327
+    "runtime_seconds": 107.07926893234253
   }
 }

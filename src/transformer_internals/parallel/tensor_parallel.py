@@ -54,6 +54,7 @@ from transformer_internals.parallel.common import (
     identical_block,
     parallel_config,
 )
+from transformer_internals.perf.activation_memory import ActivationMeter
 
 __all__ = [
     "ColumnParallelLinear",
@@ -320,8 +321,15 @@ def tp_equivalence_worker(
     x_ref = x.clone().requires_grad_(True)
     x_tp = x.clone().requires_grad_(True)
 
-    ref_out, _ = ref(x_ref)
-    tp_out = tp(x_tp)
+    ref_meter = ActivationMeter(exclude=[*ref.parameters(), *ref.buffers()])
+    with ref_meter:
+        ref_out, _ = ref(x_ref)
+    ref_activations = ref_meter.snapshot()
+
+    tp_meter = ActivationMeter(exclude=[*tp.parameters(), *tp.buffers()])
+    with tp_meter:
+        tp_out = tp(x_tp)
+    tp_activations = tp_meter.snapshot()
     forward_error = float((tp_out - ref_out).abs().max())
 
     # A fixed, non-uniform upstream gradient. A uniform one would hide a bug
@@ -403,4 +411,12 @@ def tp_equivalence_worker(
         "output_scale": float(ref_out.abs().max()),
         "local_params": sum(p.numel() for p in tp.parameters()),
         "reference_params": sum(p.numel() for p in ref.parameters()),
+        # Unlike ZeRO, tensor parallelism genuinely shards activations: the
+        # 4*n_embd MLP hidden and the per-head attention tensors are 1/p of the
+        # width on each rank. It does not shard all of them, because the
+        # residual stream and the LayerNorm inputs stay replicated, so the ratio
+        # is above 1/p and that gap is the replicated part.
+        "activation_bytes": tp_activations["activation_bytes"],
+        "reference_activation_bytes": ref_activations["activation_bytes"],
+        "activation_detail": tp_activations,
     }

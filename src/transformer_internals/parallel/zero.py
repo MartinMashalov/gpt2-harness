@@ -95,6 +95,7 @@ from transformer_internals.parallel.common import (
     state_bytes,
 )
 from transformer_internals.parallel.data_parallel import average_gradients, local_shard
+from transformer_internals.perf.activation_memory import ActivationMeter
 from transformer_internals.precision import reduce_dtype_of
 
 __all__ = [
@@ -946,9 +947,17 @@ def zero_equivalence_worker(
 
     errors: list[float] = []
     norms: list[dict[str, float]] = []
-    for _ in range(steps):
+    activations: dict[str, Any] = {}
+    for step in range(steps):
         opt.zero_grad()
-        model(my_inputs, targets=my_targets)["loss"].backward()
+        if step == 0:
+            meter = ActivationMeter(exclude=[*model.parameters(), *model.buffers()])
+            with meter:
+                out = model(my_inputs, targets=my_targets)
+            activations = meter.snapshot()
+        else:
+            out = model(my_inputs, targets=my_targets)
+        out["loss"].backward()
         opt.step()
         comms.get_counter().steps += 1
 
@@ -1014,6 +1023,11 @@ def zero_equivalence_worker(
         "shard_numel": opt.shard_size,
         "sharded_bytes": opt.resident_bytes(),
         "replicated_bytes": baseline_bytes,
+        # ZeRO shards parameters, gradients and optimizer state. It does not
+        # shard activations, and this column is the evidence: it is identical to
+        # DDP's at the same per-rank batch.
+        "activation_bytes": activations.get("activation_bytes", 0),
+        "activation_detail": activations,
     }
 
 
@@ -1066,9 +1080,16 @@ def zero3_equivalence_worker(
     errors: list[float] = []
     losses: list[float] = []
     norms: list[dict[str, float]] = []
-    for _ in range(steps):
+    activations: dict[str, Any] = {}
+    for step in range(steps):
         opt.zero_grad()
-        out = model(my_inputs, targets=my_targets)
+        if step == 0:
+            meter = ActivationMeter(exclude=[*model.parameters(), *model.buffers()])
+            with meter:
+                out = model(my_inputs, targets=my_targets)
+            activations = meter.snapshot()
+        else:
+            out = model(my_inputs, targets=my_targets)
         out["loss"].backward()
         opt.step()
         comms.get_counter().steps += 1
@@ -1124,4 +1145,17 @@ def zero3_equivalence_worker(
         "sharded_bytes": resident,
         "n_units": len(model.shards),
         "shard_numel": [int(s.numel()) for s in model.shards],
+        # Much smaller than ZeRO-1 and ZeRO-2 at the same batch, and not because
+        # ZeRO-3 shards activations. _GatherRunFree runs each unit under no_grad
+        # and recomputes it in the backward pass, so the forward keeps only each
+        # unit's input rather than its interior. That is activation
+        # checkpointing, and the recomputed block's activations are live
+        # transiently during the backward, so the true peak is this figure plus
+        # one block's worth.
+        "activation_bytes": activations.get("activation_bytes", 0),
+        "activation_detail": activations,
+        "activation_note": (
+            "forward stash only; ZeRO-3 here recomputes each unit in the "
+            "backward pass, so one unit's activations are live again then"
+        ),
     }

@@ -30,6 +30,7 @@ import torch.nn as nn
 
 from transformer_internals.parallel import comms
 from transformer_internals.parallel.common import identical_batch, identical_model, parallel_config
+from transformer_internals.perf.activation_memory import ActivationMeter
 from transformer_internals.precision import reduce_dtype_of
 
 __all__ = [
@@ -207,10 +208,24 @@ def ddp_equivalence_worker(
     losses: list[float] = []
     ref_losses: list[float] = []
     buckets = 0
+    local_activations: dict[str, Any] = {}
+    reference_activations: dict[str, Any] = {}
 
-    for _ in range(steps):
+    for step in range(steps):
         ddp_opt.zero_grad(set_to_none=True)
-        out = ddp_model(my_inputs, targets=my_targets)
+        # Measured on the first step only, because the stash is the same every
+        # step and the meter is not free. It changes nothing: the pack hook
+        # returns its tensor unaltered, so the graph and the collectives are
+        # identical whether it is installed or not.
+        if step == 0:
+            meter = ActivationMeter(
+                exclude=[*ddp_model.parameters(), *ddp_model.buffers()]
+            )
+            with meter:
+                out = ddp_model(my_inputs, targets=my_targets)
+            local_activations = meter.snapshot()
+        else:
+            out = ddp_model(my_inputs, targets=my_targets)
         out["loss"].backward()
         buckets = average_gradients(
             ddp_model.parameters(), world_size, bucket_bytes, reduce_dtype=reduce_dtype
@@ -218,7 +233,15 @@ def ddp_equivalence_worker(
         comms.get_counter().steps += 1
 
         ref_opt.zero_grad(set_to_none=True)
-        ref_out = ref_model(inputs, targets=targets)
+        if step == 0:
+            ref_meter = ActivationMeter(
+                exclude=[*ref_model.parameters(), *ref_model.buffers()]
+            )
+            with ref_meter:
+                ref_out = ref_model(inputs, targets=targets)
+            reference_activations = ref_meter.snapshot()
+        else:
+            ref_out = ref_model(inputs, targets=targets)
         ref_out["loss"].backward()
 
         grad_errors.append(float((_grad_vector(ddp_model) - _grad_vector(ref_model)).abs().max()))
@@ -244,4 +267,11 @@ def ddp_equivalence_worker(
         "buckets": buckets,
         "n_params": sum(p.numel() for p in ddp_model.parameters()),
         "grad_bytes": sum(p.numel() * p.element_size() for p in ddp_model.parameters()),
+        # Activations are the one memory term data parallelism shrinks, and it
+        # shrinks it for a reason that has nothing to do with data parallelism:
+        # this rank sees 1/p of the batch. Nothing about the strategy shards an
+        # activation.
+        "activation_bytes": local_activations.get("activation_bytes", 0),
+        "reference_activation_bytes": reference_activations.get("activation_bytes", 0),
+        "activation_detail": local_activations,
     }

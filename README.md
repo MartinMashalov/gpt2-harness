@@ -127,20 +127,76 @@ MB for DDP (**modelled**, same formulas, evaluated at N = 124,439,808).
 
 ### Memory per rank, measured from live tensor storages
 
-World size 2, on the tested model, in bytes.
+World size 2, on the tested model, in bytes. Every column is measured: the first
+three from the actual tensor storages, the fourth from the tensors the autograd
+graph is holding for the backward pass.
 
-| | parameters | gradients | Adam state | total |
-|---|---|---|---|---|
-| replicated (DDP + AdamW) | 228,096 | 228,096 | 456,192 | **912,384** |
-| ZeRO-1 | 228,096 | 228,096 | 228,096 | **798,336** |
-| ZeRO-2 | 228,096 | 114,048 | 228,096 | **684,288** |
-| ZeRO-3 | 126,464 | 126,464 | 252,928 | **607,488** |
+| | parameters | gradients | Adam state | state total | **activations** |
+|---|---|---|---|---|---|
+| one process, whole batch | 228,096 | 228,096 | 456,192 | 912,384 | **2,076,804** |
+| replicated (DDP + AdamW) | 228,096 | 228,096 | 456,192 | **912,384** | 1,040,004 |
+| ZeRO-1 | 228,096 | 228,096 | 228,096 | **798,336** | 1,040,004 |
+| ZeRO-2 | 228,096 | 114,048 | 228,096 | **684,288** | 1,040,004 |
+| ZeRO-3 | 126,464 | 126,464 | 252,928 | **607,488** | **84,612** |
 
 Read against the row above it, each ZeRO stage removes exactly what it claims
 to. The totals in the JSON carry one extra line, a flat per-element weight-decay
 coefficient this implementation holds because a shard boundary can fall inside a
 tensor; it is listed separately because it is not part of the Adam state the
 ZeRO formulas describe.
+
+**The activation column is the one that was missing, and it changes the
+reading.** Activations are what actually runs a real training job out of memory,
+and at this shape they are larger than the parameters, the gradients and the
+Adam state put together. Three things fall out of it:
+
+- **ZeRO does not shard activations.** 1,040,004 bytes on DDP, ZeRO-1 and
+  ZeRO-2 alike, exactly half the single-process figure, and the half is because
+  each rank sees half the batch. Nothing about sharding the optimiser touches an
+  activation. Stage 2 cuts 228,096 bytes of state and leaves 1,040,004 bytes
+  standing next to it.
+- **ZeRO-3's 84,612 is not sharding either, it is recomputation.** This
+  implementation runs each unit under `no_grad` and recomputes it during the
+  backward pass, so the forward keeps each unit's *input* and not its interior:
+  12x less. The bill arrives later, as one block's activations live again while
+  that block is being recomputed, and as a second forward pass of arithmetic.
+  That is activation checkpointing, stated as a measurement rather than as a
+  footnote.
+- **Tensor and pipeline parallelism do shard them.** One block, same batch on
+  every rank: 103,824 bytes per rank against 182,160 unsharded, a factor of
+  0.57 rather than 0.50 because the residual stream and the LayerNorm inputs
+  stay replicated while the `4C` MLP hidden and the per-head attention tensors
+  do not. And across four pipeline stages, peak bytes per stage:
+
+  | schedule | stage 0 | stage 1 | stage 2 | stage 3 |
+  |---|---|---|---|---|
+  | GPipe | 496,128 | 494,592 | 494,592 | 594,960 |
+  | 1F1B | 496,128 | 375,040 | 255,488 | **153,604** |
+
+  The staircase is 1F1B's whole reason for existing, and this is it in bytes
+  rather than in a count of micro-batches: the deepest stage holds 3.9x less
+  than it does under GPipe, because it starts its backward passes first and
+  stops accumulating. Stage 3 carries the `lm_head` and the loss, which is why
+  it is the largest under GPipe and still the smallest under 1F1B.
+
+**The analytic count agrees with the measurement to the byte.**
+`analytic_activation_bytes` enumerates the tensors this forward pass saves,
+term by term, and equals the measured figure exactly for 1, 3 and 4 layers,
+pre-LN and post-LN, all three activation functions, tied and untied heads, and
+learned and sinusoidal positions. Getting there corrected four wrong
+assumptions, each of which is a fact about autograd rather than about this
+model: the tanh GELU leaves **four** extra `4C`-wide tensors in the graph
+because it is written out of primitive operators; `relu` leaves **none**,
+because it saves its output and the next projection already saves that same
+tensor as its input; the cross entropy saves **one** `tokens x vocab` tensor and
+not two, because the log-softmax backward is written in terms of its own output;
+and `masked_fill` keeps the *inverted* causal mask, one byte per element and
+quadratic in the sequence length. Because it is exact, it can be evaluated at a
+shape nobody has run: GPT-2 124M at batch 8 x sequence 512 in fp32 needs
+**6.29 GB** of activations, of which 0.82 GB is the log-softmax alone, more than
+any single transformer block. At sequence 1024 it is 15.0 GB and the attention
+probabilities go from 22% of a layer to 36%. Those two are **computed by the
+validated count, not measured**, since neither shape has been run here.
 
 ### bf16 on the wire, and the fp32 master copy that makes it safe
 

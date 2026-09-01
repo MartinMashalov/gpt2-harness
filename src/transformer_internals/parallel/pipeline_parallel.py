@@ -42,6 +42,7 @@ from transformer_internals.parallel.common import (
     identical_model,
     parallel_config,
 )
+from transformer_internals.perf.activation_memory import ActivationMeter
 
 __all__ = [
     "PipelineStage",
@@ -364,11 +365,17 @@ def pipeline_worker(
 
     stage = PipelineStage(_reference_model(config), rank, world_size)
     timer = _Timer()
+    # The whole step is metered, so the figure covers every micro-batch this
+    # stage is holding at once. That is the point of the number: GPipe keeps all
+    # m of them alive until its backward phase and 1F1B keeps at most p, which
+    # is the difference the two schedules exist to make.
+    meter = ActivationMeter(exclude=[*stage.parameters(), *stage.buffers()])
     dist.barrier()
     t0 = time.perf_counter()
-    loss_sum, peak_stash = _run_pipeline_step(
-        stage, rank, world_size, micro_inputs, micro_targets, hidden_shape, kind, timer
-    )
+    with meter:
+        loss_sum, peak_stash = _run_pipeline_step(
+            stage, rank, world_size, micro_inputs, micro_targets, hidden_shape, kind, timer
+        )
     wall = time.perf_counter() - t0
     comms.get_counter().steps += 1
 
@@ -382,6 +389,11 @@ def pipeline_worker(
         "comm_seconds": timer.comm,
         "wall_seconds": wall,
         "stage_params": sum(p.numel() for p in stage.parameters()),
+        # Peak, not final: the backward passes interleaved with the forwards
+        # free activations as they go, so the high-water mark is the number that
+        # decides whether the stage fits.
+        "activation_peak_bytes": meter.peak_bytes,
+        "activation_detail": meter.to_dict(),
     }
 
     if check_grads:

@@ -124,6 +124,8 @@ def main() -> int:
         {"batch": batch, "seq": seq, "steps": args.steps},
     )
     n_params = ddp[0].value["n_params"]
+    ddp_activations = ddp[0].value["activation_bytes"]
+    reference_activations = ddp[0].value["reference_activation_bytes"]
     equivalence["data_parallel"] = {
         "what_is_compared": "gradient of every parameter, and parameters after an SGD step",
         "reference": "single process, full batch, no collectives",
@@ -167,6 +169,7 @@ def main() -> int:
         memory[f"zero_{stage}"] = {
             "sharded_bytes_per_rank": v["sharded_bytes"],
             "replicated_bytes_per_rank": v["replicated_bytes"],
+            "activation_bytes_per_rank": v["activation_bytes"],
             "shard_numel": v["shard_numel"],
             "n_params": v["n_params"],
         }
@@ -214,9 +217,26 @@ def main() -> int:
         "world_size": p,
     }
     comms_report["zero_3"] = z3[0].payload
+    memory["data_parallel"] = {
+        "sharded_bytes_per_rank": memory["zero_1"]["replicated_bytes_per_rank"],
+        "replicated_bytes_per_rank": memory["zero_1"]["replicated_bytes_per_rank"],
+        "activation_bytes_per_rank": ddp_activations,
+        "n_params": n_params,
+    }
+    memory["single_process_reference"] = {
+        "activation_bytes_per_rank": reference_activations,
+        "note": (
+            "one process holding the whole batch. Every per-rank activation "
+            "figure above should be read against this: data parallelism and ZeRO "
+            "reduce it only because each rank sees 1/p of the batch, and neither "
+            "shards an activation."
+        ),
+    }
     memory["zero_3"] = {
         "sharded_bytes_per_rank": v3["sharded_bytes"],
         "replicated_bytes_per_rank": memory["zero_2"]["replicated_bytes_per_rank"],
+        "activation_bytes_per_rank": v3["activation_bytes"],
+        "activation_note": v3["activation_note"],
         "n_params": v3["n_params"],
         "n_block_params": v3["n_block_params"],
         "units": v3["n_units"],
@@ -226,6 +246,11 @@ def main() -> int:
         f"      stage 3: max parameter error {v3['max_param_error']:.2e} | "
         f"resident {v3['sharded_bytes']['total'] / 1e3:.1f} kB/rank | "
         f"{v3['n_units']} sharded units"
+    )
+    print(
+        f"      activations/rank: single process {reference_activations / 1e3:.1f} kB | "
+        f"DDP and ZeRO-1/2 {ddp_activations / 1e3:.1f} kB | "
+        f"ZeRO-3 {v3['activation_bytes'] / 1e3:.1f} kB (recomputes)"
     )
 
     # ---------------------------------------------------------- tensor par
@@ -245,6 +270,18 @@ def main() -> int:
         "world_size": p,
     }
     comms_report["tensor_parallel"] = tp[0].payload
+    memory["tensor_parallel_block"] = {
+        "activation_bytes_per_rank": tv["activation_bytes"],
+        "reference_activation_bytes": tv["reference_activation_bytes"],
+        "local_params": tv["local_params"],
+        "reference_params": tv["reference_params"],
+        "note": (
+            "one block, same batch on every rank. Unlike ZeRO this genuinely "
+            "shards activations: the 4C MLP hidden and the per-head attention "
+            "tensors are 1/p of the width. The residual stream and the LayerNorm "
+            "inputs stay replicated, which is why the ratio is above 1/p."
+        ),
+    }
     checks.append(
         _check(
             "tensor_parallel.all_reduce",
@@ -278,6 +315,17 @@ def main() -> int:
             "stage_params": [r.value["stage_params"] for r in res],
             "peak_stash": [r.value["peak_stash"] for r in res],
             "world_size": pipe_stages,
+        }
+        memory[f"pipeline_{kind}"] = {
+            "activation_peak_bytes_per_rank": [
+                r.value["activation_peak_bytes"] for r in res
+            ],
+            "peak_stash_micro_batches": [r.value["peak_stash"] for r in res],
+            "note": (
+                "peak over the whole step, per stage. Pipeline parallelism shards "
+                "activations by depth, and the schedule decides how many "
+                "micro-batches of them are alive at once."
+            ),
         }
         comms_report[f"pipeline_{kind}"] = res[0].payload
         print(
