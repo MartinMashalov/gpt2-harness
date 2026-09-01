@@ -1,0 +1,373 @@
+{
+  "machine_peak": {
+    "device": "mps",
+    "dtype": "float32",
+    "peak_flops_per_s": 6489104169141.945,
+    "peak_bytes_per_s": 307973741854.51355,
+    "ridge_flops_per_byte": 21.070316352513554,
+    "gemm_sweep": [
+      {
+        "n": 256.0,
+        "seconds": 0.00038237497210502625,
+        "flops_per_s": 87752688977.72856
+      },
+      {
+        "n": 512.0,
+        "seconds": 0.0005726669915020466,
+        "flops_per_s": 468746164845.1597
+      },
+      {
+        "n": 1024.0,
+        "seconds": 0.0015501249581575394,
+        "flops_per_s": 1385361635975.7695
+      },
+      {
+        "n": 2048.0,
+        "seconds": 0.003019374969881028,
+        "flops_per_s": 5689876002607.564
+      },
+      {
+        "n": 3072.0,
+        "seconds": 0.00906241696793586,
+        "flops_per_s": 6398078868049.098
+      },
+      {
+        "n": 4096.0,
+        "seconds": 0.021179957955610007,
+        "flops_per_s": 6489104169141.945
+      }
+    ],
+    "bandwidth_sweep": [
+      {
+        "array_mib": 16.0,
+        "elements": 4194304.0,
+        "seconds": 0.0004292079829610884,
+        "bytes_per_s": 117266337062.89433
+      },
+      {
+        "array_mib": 64.0,
+        "elements": 16777216.0,
+        "seconds": 0.0010577500215731561,
+        "bytes_per_s": 190334755749.35342
+      },
+      {
+        "array_mib": 256.0,
+        "elements": 67108864.0,
+        "seconds": 0.0027427920140326023,
+        "bytes_per_s": 293608251693.86237
+      },
+      {
+        "array_mib": 512.0,
+        "elements": 134217728.0,
+        "seconds": 0.005229707981925458,
+        "bytes_per_s": 307973741854.51355
+      }
+    ],
+    "meta": {
+      "platform": "macOS-10.16-x86_64-i386-64bit",
+      "processor": "i386",
+      "torch": "2.2.2",
+      "threads": 10
+    }
+  },
+  "shape": {
+    "batch": 8,
+    "seq": 512,
+    "dtype_bytes": 4,
+    "model_config": {
+      "vocab_size": 50257,
+      "n_positions": 1024,
+      "n_layer": 12,
+      "n_head": 12,
+      "n_kv_head": null,
+      "n_embd": 768,
+      "dropout": 0.0,
+      "layer_norm_epsilon": 1e-05,
+      "norm_position": "pre",
+      "pos_embedding": "learned",
+      "tie_weights": true,
+      "activation": "gelu_tanh",
+      "residual_scaled_init": true,
+      "attn_bias": true,
+      "mlp_bias": true,
+      "use_sdpa": false
+    }
+  },
+  "elementwise_flop_costs": {
+    "gelu_tanh": 9,
+    "layernorm": 8,
+    "softmax": 5,
+    "residual_add": 1
+  },
+  "ops": [
+    {
+      "name": "ln_1 (LayerNorm)",
+      "kind": "elementwise",
+      "flops": 25165824.0,
+      "bytes_moved": 25171968.0,
+      "intensity": 0.9997559189650964,
+      "bound": "memory",
+      "attainable_flops_per_s": 307898571304.87854,
+      "roofline_seconds": 8.173413697032396e-05
+    },
+    {
+      "name": "qkv projection (GEMM)",
+      "kind": "gemm",
+      "flops": 14495514624.0,
+      "bytes_moved": 57409536.0,
+      "intensity": 252.4931506849315,
+      "bound": "compute",
+      "attainable_flops_per_s": 6489104169141.945,
+      "roofline_seconds": 0.002233823690630743
+    },
+    {
+      "name": "attention scores QK^T (batched GEMM)",
+      "kind": "batched_gemm",
+      "flops": 3221225472.0,
+      "bytes_moved": 125829120.0,
+      "intensity": 25.6,
+      "bound": "compute",
+      "attainable_flops_per_s": 6489104169141.945,
+      "roofline_seconds": 0.0004964052645846095
+    },
+    {
+      "name": "softmax (+ causal mask)",
+      "kind": "elementwise",
+      "flops": 176160768.0,
+      "bytes_moved": 201326592.0,
+      "intensity": 0.875,
+      "bound": "memory",
+      "attainable_flops_per_s": 269477024122.69934,
+      "roofline_seconds": 0.0006537134977406823
+    },
+    {
+      "name": "attention x V (batched GEMM)",
+      "kind": "batched_gemm",
+      "flops": 3221225472.0,
+      "bytes_moved": 125829120.0,
+      "intensity": 25.6,
+      "bound": "compute",
+      "attainable_flops_per_s": 6489104169141.945,
+      "roofline_seconds": 0.0004964052645846095
+    },
+    {
+      "name": "output projection (GEMM)",
+      "kind": "gemm",
+      "flops": 4831838208.0,
+      "bytes_moved": 27525120.0,
+      "intensity": 175.54285714285714,
+      "bound": "compute",
+      "attainable_flops_per_s": 6489104169141.945,
+      "roofline_seconds": 0.0007446078968769143
+    },
+    {
+      "name": "residual add (attn)",
+      "kind": "elementwise",
+      "flops": 3145728.0,
+      "bytes_moved": 37748736.0,
+      "intensity": 0.08333333333333333,
+      "bound": "memory",
+      "attainable_flops_per_s": 25664478487.87613,
+      "roofline_seconds": 0.00012257128082637792
+    },
+    {
+      "name": "ln_2 (LayerNorm)",
+      "kind": "elementwise",
+      "flops": 25165824.0,
+      "bytes_moved": 25171968.0,
+      "intensity": 0.9997559189650964,
+      "bound": "memory",
+      "attainable_flops_per_s": 307898571304.87854,
+      "roofline_seconds": 8.173413697032396e-05
+    },
+    {
+      "name": "MLP up 4x (GEMM)",
+      "kind": "gemm",
+      "flops": 19327352832.0,
+      "bytes_moved": 72351744.0,
+      "intensity": 267.1304347826087,
+      "bound": "compute",
+      "attainable_flops_per_s": 6489104169141.945,
+      "roofline_seconds": 0.0029784315875076572
+    },
+    {
+      "name": "GELU (tanh)",
+      "kind": "elementwise",
+      "flops": 113246208.0,
+      "bytes_moved": 100663296.0,
+      "intensity": 1.125,
+      "bound": "memory",
+      "attainable_flops_per_s": 346470459586.32776,
+      "roofline_seconds": 0.0003268567488703411
+    },
+    {
+      "name": "MLP down (GEMM)",
+      "kind": "gemm",
+      "flops": 19327352832.0,
+      "bytes_moved": 72351744.0,
+      "intensity": 267.1304347826087,
+      "bound": "compute",
+      "attainable_flops_per_s": 6489104169141.945,
+      "roofline_seconds": 0.0029784315875076572
+    },
+    {
+      "name": "residual add (mlp)",
+      "kind": "elementwise",
+      "flops": 3145728.0,
+      "bytes_moved": 37748736.0,
+      "intensity": 0.08333333333333333,
+      "bound": "memory",
+      "attainable_flops_per_s": 25664478487.87613,
+      "roofline_seconds": 0.00012257128082637792
+    }
+  ],
+  "summary": {
+    "n_ops": 12,
+    "n_memory_bound": 6,
+    "n_compute_bound": 6,
+    "flops_in_memory_bound_ops_fraction": 0.005342399222923749,
+    "roofline_time_in_memory_bound_ops_fraction": 0.12274860212149274,
+    "roofline_block_seconds": 0.011317286373896618
+  },
+  "measured_op_rates": [
+    {
+      "op": "qkv projection (GEMM)",
+      "seconds": 0.003429915988817811,
+      "flops_per_s": 4226201070597.116
+    },
+    {
+      "op": "output projection (GEMM)",
+      "seconds": 0.001327750040218234,
+      "flops_per_s": 3639117350134.533
+    },
+    {
+      "op": "MLP down (GEMM)",
+      "seconds": 0.003893999964930117,
+      "flops_per_s": 4963367490001.211
+    },
+    {
+      "op": "attention x V (batched GEMM)",
+      "seconds": 0.0013129580183885992,
+      "flops_per_s": 2453410868348.577
+    },
+    {
+      "op": "MLP up 4x (GEMM)",
+      "seconds": 0.004637333971913904,
+      "flops_per_s": 4167772463457.7666
+    },
+    {
+      "op": "attention scores QK^T (batched GEMM)",
+      "seconds": 0.0019412920228205621,
+      "flops_per_s": 1659320408332.8914
+    },
+    {
+      "op": "softmax (+ causal mask)",
+      "seconds": 0.002771749976091087,
+      "flops_per_s": 63555793098.06077
+    },
+    {
+      "op": "ln_1 (LayerNorm)",
+      "seconds": 0.001071999955456704,
+      "flops_per_s": 23475583064.99986
+    },
+    {
+      "op": "GELU (tanh)",
+      "seconds": 0.0004342499887570739,
+      "flops_per_s": 65196436921.12544
+    },
+    {
+      "op": "residual add (attn)",
+      "seconds": 0.00047554203774780035,
+      "flops_per_s": 6615036632.509679
+    }
+  ],
+  "mfu": {
+    "device": "mps",
+    "batch": 4,
+    "seq": 256,
+    "steps_timed": 6,
+    "step_s": 0.2545028750319034,
+    "tokens_per_s": 4023.530185549518,
+    "model_flops_per_step": 787971833856.0,
+    "achieved_flops_per_s": 3096121541877.3687,
+    "peak_flops_per_s": 6489104169141.945,
+    "mfu": 0.4771261889430832,
+    "step_times_s": [
+      0.5311098330421373,
+      0.2545028750319034,
+      0.2553353330004029,
+      0.25473724998300895,
+      0.2573646670207381,
+      0.2596474580350332
+    ],
+    "flops_breakdown": {
+      "seq_len": 256.0,
+      "forward_projection_flops_per_token": 247064064.0,
+      "forward_attention_quadratic_flops_per_token": 9437184.0,
+      "forward_total_flops_per_token": 256501248.0,
+      "training_flops_per_token": 769503744.0,
+      "training_attention_quadratic_flops_per_token": 28311552.0,
+      "attention_quadratic_fraction": 0.03679196133969687,
+      "n_params_total": 124439808.0,
+      "n_params_non_embedding": 85056000.0,
+      "flops_6n_total_per_token": 746638848.0,
+      "flops_6n_non_embedding_per_token": 510336000.0,
+      "ratio_to_6nd_total": 1.0306237695255847,
+      "causal_aware": 0.0
+    },
+    "modelled_gpu_mfu": [
+      {
+        "accelerator": "NVIDIA A100 80GB SXM",
+        "status": "modelled from published spec, not measured",
+        "peak_flops_per_s": 312000000000000.0,
+        "precision": "bf16 tensor core, dense",
+        "mfu_if_this_rate_were_sustained": 0.009923466480376182,
+        "ridge_point_flops_per_byte": 153.01618440411966,
+        "source": "NVIDIA A100 Tensor Core GPU datasheet, rev. 2021 (312 TFLOPS BFLOAT16 dense, 2039 GB/s)"
+      },
+      {
+        "accelerator": "NVIDIA H100 SXM5",
+        "status": "modelled from published spec, not measured",
+        "peak_flops_per_s": 989400000000000.0,
+        "precision": "bf16 tensor core, dense",
+        "mfu_if_this_rate_were_sustained": 0.0031292920374745995,
+        "ridge_point_flops_per_byte": 295.34328358208955,
+        "source": "NVIDIA H100 Tensor Core GPU datasheet, rev. 2023 (1979 TFLOPS BFLOAT16 with sparsity, i.e. 989.4 dense; 3.35 TB/s)"
+      },
+      {
+        "accelerator": "NVIDIA H200 SXM",
+        "status": "modelled from published spec, not measured",
+        "peak_flops_per_s": 989400000000000.0,
+        "precision": "bf16 tensor core, dense",
+        "mfu_if_this_rate_were_sustained": 0.0031292920374745995,
+        "ridge_point_flops_per_byte": 206.125,
+        "source": "NVIDIA H200 Tensor Core GPU datasheet, rev. 2024 (same SM peak as H100 SXM; 4.8 TB/s)"
+      }
+    ],
+    "meta": {
+      "platform": "macOS-10.16-x86_64-i386-64bit",
+      "torch": "2.2.2",
+      "threads": 10,
+      "model_config": {
+        "vocab_size": 50257,
+        "n_positions": 1024,
+        "n_layer": 12,
+        "n_head": 12,
+        "n_kv_head": null,
+        "n_embd": 768,
+        "dropout": 0.0,
+        "layer_norm_epsilon": 1e-05,
+        "norm_position": "pre",
+        "pos_embedding": "learned",
+        "tie_weights": true,
+        "activation": "gelu_tanh",
+        "residual_scaled_init": true,
+        "attn_bias": true,
+        "mlp_bias": true,
+        "use_sdpa": false
+      },
+      "statistic": "minimum over the timed steps"
+    },
+    "flops_6nd_total": 764558180352.0
+  }
+}

@@ -1,0 +1,2598 @@
+{
+  "machine_peak": {
+    "device": "cpu",
+    "dtype": "float32",
+    "peak_flops_per_s": 274906497181.3807,
+    "peak_bytes_per_s": 105467561066.57394,
+    "ridge_flops_per_byte": 2.6065502454148186,
+    "gemm_sweep": [
+      {
+        "n": 256.0,
+        "seconds": 0.00022187497233971953,
+        "flops_per_s": 151231261670.30585
+      },
+      {
+        "n": 512.0,
+        "seconds": 0.0014319170149974525,
+        "flops_per_s": 187465791095.7763
+      },
+      {
+        "n": 1024.0,
+        "seconds": 0.00867195799946785,
+        "flops_per_s": 247635383858.15283
+      },
+      {
+        "n": 2048.0,
+        "seconds": 0.062493500008713454,
+        "flops_per_s": 274906497181.3807
+      },
+      {
+        "n": 3072.0,
+        "seconds": 0.23437541601015255,
+        "flops_per_s": 247389677138.6994
+      },
+      {
+        "n": 4096.0,
+        "seconds": 0.5979471250320785,
+        "flops_per_s": 229851349255.38226
+      }
+    ],
+    "bandwidth_sweep": [
+      {
+        "array_mib": 16.0,
+        "elements": 4194304.0,
+        "seconds": 0.0020022920216433704,
+        "bytes_per_s": 25137016706.829094
+      },
+      {
+        "array_mib": 64.0,
+        "elements": 16777216.0,
+        "seconds": 0.005895666021388024,
+        "bytes_per_s": 34148235546.185406
+      },
+      {
+        "array_mib": 256.0,
+        "elements": 67108864.0,
+        "seconds": 0.008579834015108645,
+        "bytes_per_s": 93860366830.16211
+      },
+      {
+        "array_mib": 512.0,
+        "elements": 134217728.0,
+        "seconds": 0.01527116697980091,
+        "bytes_per_s": 105467561066.57394
+      }
+    ],
+    "meta": {
+      "platform": "macOS-10.16-x86_64-i386-64bit",
+      "processor": "i386",
+      "torch": "2.2.2",
+      "threads": 10
+    }
+  },
+  "reports": [
+    {
+      "label": "baseline (nothing injected)",
+      "device": "cpu",
+      "shape": {
+        "batch": 8,
+        "seq": 128,
+        "tokens_per_step": 1024,
+        "model_config": {
+          "vocab_size": 4096,
+          "n_positions": 256,
+          "n_layer": 4,
+          "n_head": 4,
+          "n_kv_head": null,
+          "n_embd": 256,
+          "dropout": 0.0,
+          "layer_norm_epsilon": 1e-05,
+          "norm_position": "pre",
+          "pos_embedding": "learned",
+          "tie_weights": true,
+          "activation": "gelu_tanh",
+          "residual_scaled_init": true,
+          "attn_bias": true,
+          "mlp_bias": true,
+          "use_sdpa": false
+        },
+        "n_params": 4273664
+      },
+      "throughput": {
+        "step_s": 0.3561568330042064,
+        "compute_s": 0.35604516696184874,
+        "fetch_s": 0.00011166604235768318,
+        "statistic": "minimum over the timed steps",
+        "tokens_per_s": 2875.137874970676,
+        "model_flops_per_step": 27380416512.0,
+        "achieved_flops_per_s_end_to_end": 76877414595.82391,
+        "achieved_flops_per_s_compute_only": 76901525572.27069,
+        "peak_flops_per_s": 274906497181.3807,
+        "mfu_end_to_end": 0.27964931852847746,
+        "mfu_compute_only": 0.2797370246274383,
+        "roofline_ceiling_mfu": 0.9765566638226352,
+        "roofline_ideal_step_s": 0.07878915099930418
+      },
+      "findings": [
+        {
+          "name": "memory-bound operator time",
+          "severity": "significant",
+          "cost_fraction": 0.2708835898392538,
+          "recoverable": false,
+          "headline": "27.1% of operator self time is outside the matmul family; the roofline says those ops cannot reach peak arithmetic",
+          "evidence": {
+            "matmul_self_fraction": 0.6997860509308151,
+            "elementwise_self_fraction": 0.14319378795801677,
+            "softmax_self_fraction": 0.05690327519797125,
+            "data movement_self_fraction": 0.0402419059922828,
+            "ridge_point_flops_per_byte": 2.6065502454148186,
+            "n_memory_bound_ops_in_block": 6
+          },
+          "recommendation": "fuse: these ops are bandwidth-limited, so the win comes from touching memory once (fused LayerNorm, fused attention) rather than from faster arithmetic"
+        },
+        {
+          "name": "dataloader stall",
+          "severity": "healthy",
+          "cost_fraction": 0.0003135305348932175,
+          "recoverable": true,
+          "headline": "0.0% of the step is spent blocked in next(loader) with the device idle (0.1 ms fetch vs 356.0 ms compute)",
+          "evidence": {
+            "fetch_ms": 0.11166604235768318,
+            "compute_ms": 356.04516696184874,
+            "step_ms": 356.1568330042064,
+            "injected_stall_ms": 0.0,
+            "batches_served": 8
+          },
+          "recommendation": "input pipeline keeps up; nothing to do"
+        },
+        {
+          "name": "batch too small to saturate",
+          "severity": "healthy",
+          "cost_fraction": 0.0,
+          "recoverable": true,
+          "headline": "at batch 8 the step reaches 3,179 tokens/s against 3,179 tokens/s at batch 8, a 0% shortfall",
+          "evidence": {
+            "tokens_per_s_by_batch": {
+              "1": 1860,
+              "2": 2952,
+              "4": 3235,
+              "8": 3179
+            },
+            "best_batch_at_or_above_this_one": 8,
+            "shortfall_fraction": 0.0
+          },
+          "recommendation": "batch is large enough that per-step fixed costs are amortised"
+        }
+      ],
+      "measurements": {
+        "step_breakdown": {
+          "steps": 6,
+          "statistic": "minimum over the timed steps",
+          "fetch_s": [
+            0.00011629197979345918,
+            0.0001145839923992753,
+            0.00011166604235768318,
+            0.0001117499778047204,
+            0.00011199997970834374,
+            0.00011558301048353314
+          ],
+          "compute_s": [
+            0.3813661250169389,
+            0.44522470800438896,
+            0.35604516696184874,
+            0.3988325839745812,
+            0.3831428340054117,
+            0.49909283401211724
+          ],
+          "best_fetch_s": 0.00011166604235768318,
+          "best_compute_s": 0.35604516696184874,
+          "best_step_s": 0.3561568330042064,
+          "median_fetch_s": 0.00011329198605380952,
+          "median_compute_s": 0.39098770898999646,
+          "stall_fraction": 0.0003135305348932175
+        },
+        "flops_breakdown": {
+          "seq_len": 128.0,
+          "forward_projection_flops_per_token": 8388608.0,
+          "forward_attention_quadratic_flops_per_token": 524288.0,
+          "forward_total_flops_per_token": 8912896.0,
+          "training_flops_per_token": 26738688.0,
+          "training_attention_quadratic_flops_per_token": 1572864.0,
+          "attention_quadratic_fraction": 0.058823529411764705,
+          "n_params_total": 4273664.0,
+          "n_params_non_embedding": 3159552.0,
+          "flops_6n_total_per_token": 25641984.0,
+          "flops_6n_non_embedding_per_token": 18957312.0,
+          "ratio_to_6nd_total": 1.0427698574338085,
+          "causal_aware": 0.0
+        },
+        "batch_sweep": [
+          {
+            "batch": 1.0,
+            "step_s": 0.06881929200608283,
+            "tokens_per_s": 1859.9435749598567
+          },
+          {
+            "batch": 2.0,
+            "step_s": 0.08672004198888317,
+            "tokens_per_s": 2952.028090955228
+          },
+          {
+            "batch": 4.0,
+            "step_s": 0.1582522499957122,
+            "tokens_per_s": 3235.3410457915925
+          },
+          {
+            "batch": 8.0,
+            "step_s": 0.32210366596700624,
+            "tokens_per_s": 3179.1007312064885
+          }
+        ],
+        "collectives": null,
+        "profile": {
+          "device": "cpu",
+          "batch": 8,
+          "seq": 128,
+          "active_steps": 1,
+          "total_self_us": 585186.0,
+          "top_ops": [
+            {
+              "name": "aten::mm",
+              "self_us": 267945.0,
+              "self_fraction": 0.4578800586480196,
+              "total_us": 267946.0,
+              "count": 35,
+              "category": "matmul"
+            },
+            {
+              "name": "aten::addmm",
+              "self_us": 108535.0,
+              "self_fraction": 0.18547094428096367,
+              "total_us": 112665.0,
+              "count": 16,
+              "category": "matmul"
+            },
+            {
+              "name": "aten::bmm",
+              "self_us": 29677.0,
+              "self_fraction": 0.05071379014535549,
+              "total_us": 29677.0,
+              "count": 24,
+              "category": "matmul"
+            },
+            {
+              "name": "aten::mul",
+              "self_us": 29024.0,
+              "self_fraction": 0.04959790562316939,
+              "total_us": 29824.0,
+              "count": 44,
+              "category": "elementwise"
+            },
+            {
+              "name": "aten::tanh",
+              "self_us": 17641.0,
+              "self_fraction": 0.03014597068282563,
+              "total_us": 17641.0,
+              "count": 4,
+              "category": "elementwise"
+            },
+            {
+              "name": "aten::_log_softmax",
+              "self_us": 15107.0,
+              "self_fraction": 0.025815723547726706,
+              "total_us": 15107.0,
+              "count": 1,
+              "category": "softmax"
+            },
+            {
+              "name": "aten::add",
+              "self_us": 13570.0,
+              "self_fraction": 0.02318920821755818,
+              "total_us": 13683.0,
+              "count": 18,
+              "category": "elementwise"
+            },
+            {
+              "name": "aten::copy_",
+              "self_us": 13469.0,
+              "self_fraction": 0.023016613521171046,
+              "total_us": 13469.0,
+              "count": 352,
+              "category": "data movement"
+            },
+            {
+              "name": "ProfilerStep*",
+              "self_us": 11120.0,
+              "self_fraction": 0.019002505186385184,
+              "total_us": 585186.0,
+              "count": 1,
+              "category": "other"
+            },
+            {
+              "name": "aten::_log_softmax_backward_data",
+              "self_us": 10198.0,
+              "self_fraction": 0.01742693775996008,
+              "total_us": 10198.0,
+              "count": 1,
+              "category": "softmax"
+            },
+            {
+              "name": "aten::_softmax",
+              "self_us": 6334.0,
+              "self_fraction": 0.010823908979367244,
+              "total_us": 6334.0,
+              "count": 4,
+              "category": "softmax"
+            },
+            {
+              "name": "aten::pow",
+              "self_us": 5022.0,
+              "self_fraction": 0.008581886784714603,
+              "total_us": 5027.0,
+              "count": 8,
+              "category": "elementwise"
+            },
+            {
+              "name": "aten::sum",
+              "self_us": 4212.0,
+              "self_fraction": 0.007197711496857409,
+              "total_us": 4310.0,
+              "count": 17,
+              "category": "reduction"
+            },
+            {
+              "name": "aten::add_",
+              "self_us": 4193.0,
+              "self_fraction": 0.007165243187636068,
+              "total_us": 4774.0,
+              "count": 120,
+              "category": "elementwise"
+            },
+            {
+              "name": "aten::mul_",
+              "self_us": 3499.0,
+              "self_fraction": 0.0059792954718670644,
+              "total_us": 4160.0,
+              "count": 104,
+              "category": "elementwise"
+            },
+            {
+              "name": "Optimizer.step#AdamW.step",
+              "self_us": 3472.0,
+              "self_fraction": 0.005933156295605158,
+              "total_us": 16728.0,
+              "count": 1,
+              "category": "optimizer"
+            },
+            {
+              "name": "aten::view",
+              "self_us": 3362.0,
+              "self_fraction": 0.005745181873797391,
+              "total_us": 3362.0,
+              "count": 157,
+              "category": "data movement"
+            },
+            {
+              "name": "aten::native_layer_norm_backward",
+              "self_us": 3152.0,
+              "self_fraction": 0.005386321613982563,
+              "total_us": 3294.0,
+              "count": 9,
+              "category": "normalization"
+            },
+            {
+              "name": "aten::native_layer_norm",
+              "self_us": 3065.0,
+              "self_fraction": 0.005237650934916419,
+              "total_us": 3167.0,
+              "count": 9,
+              "category": "normalization"
+            },
+            {
+              "name": "aten::div",
+              "self_us": 2764.0,
+              "self_fraction": 0.004723284562515166,
+              "total_us": 3252.0,
+              "count": 60,
+              "category": "elementwise"
+            }
+          ],
+          "categories": [
+            {
+              "category": "matmul",
+              "self_us": 409505.0,
+              "self_fraction": 0.6997860509308151
+            },
+            {
+              "category": "elementwise",
+              "self_us": 83795.0,
+              "self_fraction": 0.14319378795801677
+            },
+            {
+              "category": "softmax",
+              "self_us": 33299.0,
+              "self_fraction": 0.05690327519797125
+            },
+            {
+              "category": "data movement",
+              "self_us": 23549.0,
+              "self_fraction": 0.0402419059922828
+            },
+            {
+              "category": "other",
+              "self_us": 17114.0,
+              "self_fraction": 0.02924540231652842
+            },
+            {
+              "category": "normalization",
+              "self_us": 6702.0,
+              "self_fraction": 0.011452768863233228
+            },
+            {
+              "category": "reduction",
+              "self_us": 4212.0,
+              "self_fraction": 0.007197711496857409
+            },
+            {
+              "category": "optimizer",
+              "self_us": 3694.0,
+              "self_fraction": 0.006312522855980833
+            },
+            {
+              "category": "allocation",
+              "self_us": 2164.0,
+              "self_fraction": 0.0036979695344728
+            },
+            {
+              "category": "embedding",
+              "self_us": 634.0,
+              "self_fraction": 0.0010834162129647667
+            },
+            {
+              "category": "loss",
+              "self_us": 518.0,
+              "self_fraction": 0.000885188640876576
+            }
+          ],
+          "trace_path": null,
+          "profiler_flops": 27438350336.0,
+          "meta": {
+            "platform": "macOS-10.16-x86_64-i386-64bit",
+            "torch": "2.2.2",
+            "threads": 10,
+            "model_config": {
+              "vocab_size": 4096,
+              "n_positions": 256,
+              "n_layer": 4,
+              "n_head": 4,
+              "n_kv_head": null,
+              "n_embd": 256,
+              "dropout": 0.0,
+              "layer_norm_epsilon": 1e-05,
+              "norm_position": "pre",
+              "pos_embedding": "learned",
+              "tie_weights": true,
+              "activation": "gelu_tanh",
+              "residual_scaled_init": true,
+              "attn_bias": true,
+              "mlp_bias": true,
+              "use_sdpa": false
+            },
+            "note": "self time partitions the step; total time double counts parents"
+          }
+        }
+      },
+      "meta": {
+        "platform": "macOS-10.16-x86_64-i386-64bit",
+        "torch": "2.2.2",
+        "threads": 10,
+        "peak_source": "measured on this machine",
+        "peak_device": "cpu",
+        "peak_device_matches_run_device": true
+      }
+    },
+    {
+      "label": "slow dataloader (+178 ms per batch, injected)",
+      "device": "cpu",
+      "shape": {
+        "batch": 8,
+        "seq": 128,
+        "tokens_per_step": 1024,
+        "model_config": {
+          "vocab_size": 4096,
+          "n_positions": 256,
+          "n_layer": 4,
+          "n_head": 4,
+          "n_kv_head": null,
+          "n_embd": 256,
+          "dropout": 0.0,
+          "layer_norm_epsilon": 1e-05,
+          "norm_position": "pre",
+          "pos_embedding": "learned",
+          "tie_weights": true,
+          "activation": "gelu_tanh",
+          "residual_scaled_init": true,
+          "attn_bias": true,
+          "mlp_bias": true,
+          "use_sdpa": false
+        },
+        "n_params": 4273664
+      },
+      "throughput": {
+        "step_s": 0.48030799999833107,
+        "compute_s": 0.3019766249926761,
+        "fetch_s": 0.178331375005655,
+        "statistic": "minimum over the timed steps",
+        "tokens_per_s": 2131.965322258963,
+        "model_flops_per_step": 27380416512.0,
+        "achieved_flops_per_s_end_to_end": 57005955578.70187,
+        "achieved_flops_per_s_compute_only": 90670648804.90027,
+        "peak_flops_per_s": 274906497181.3807,
+        "mfu_end_to_end": 0.20736489011058146,
+        "mfu_compute_only": 0.32982359360199714,
+        "roofline_ceiling_mfu": 0.9765566638226352,
+        "roofline_ideal_step_s": 0.07878915099930418
+      },
+      "findings": [
+        {
+          "name": "dataloader stall",
+          "severity": "critical",
+          "cost_fraction": 0.3712854564285305,
+          "recoverable": true,
+          "headline": "37.1% of the step is spent blocked in next(loader) with the device idle (178.3 ms fetch vs 302.0 ms compute)",
+          "evidence": {
+            "fetch_ms": 178.331375005655,
+            "compute_ms": 301.9766249926761,
+            "step_ms": 480.30799999833107,
+            "injected_stall_ms": 178.02258348092437,
+            "batches_served": 8
+          },
+          "recommendation": "prefetch: move decoding and collation onto worker processes and keep a queue ahead of the trainer, so the fetch happens during the previous step"
+        },
+        {
+          "name": "memory-bound operator time",
+          "severity": "significant",
+          "cost_fraction": 0.16905004425450787,
+          "recoverable": false,
+          "headline": "26.9% of operator self time is outside the matmul family; the roofline says those ops cannot reach peak arithmetic",
+          "evidence": {
+            "matmul_self_fraction": 0.6821726503607555,
+            "elementwise_self_fraction": 0.13636990538788601,
+            "softmax_self_fraction": 0.04973342317740658,
+            "data movement_self_fraction": 0.04018552013019509,
+            "ridge_point_flops_per_byte": 2.6065502454148186,
+            "n_memory_bound_ops_in_block": 6
+          },
+          "recommendation": "fuse: these ops are bandwidth-limited, so the win comes from touching memory once (fused LayerNorm, fused attention) rather than from faster arithmetic"
+        },
+        {
+          "name": "batch too small to saturate",
+          "severity": "healthy",
+          "cost_fraction": 0.0,
+          "recoverable": true,
+          "headline": "at batch 8 the step reaches 4,182 tokens/s against 4,182 tokens/s at batch 8, a 0% shortfall",
+          "evidence": {
+            "tokens_per_s_by_batch": {
+              "1": 1845,
+              "2": 2583,
+              "4": 3359,
+              "8": 4182
+            },
+            "best_batch_at_or_above_this_one": 8,
+            "shortfall_fraction": 0.0
+          },
+          "recommendation": "batch is large enough that per-step fixed costs are amortised"
+        }
+      ],
+      "measurements": {
+        "step_breakdown": {
+          "steps": 6,
+          "statistic": "minimum over the timed steps",
+          "fetch_s": [
+            0.18568504200084135,
+            0.1881721660029143,
+            0.178331375005655,
+            0.18816349998814985,
+            0.17934675002470613,
+            0.18705908302217722
+          ],
+          "compute_s": [
+            0.39517024997621775,
+            0.32426645897794515,
+            0.3444766250322573,
+            0.3279419169994071,
+            0.3019766249926761,
+            0.304782958002761
+          ],
+          "best_fetch_s": 0.178331375005655,
+          "best_compute_s": 0.3019766249926761,
+          "best_step_s": 0.48030799999833107,
+          "median_fetch_s": 0.18637206251150928,
+          "median_compute_s": 0.32610418798867613,
+          "stall_fraction": 0.3712854564285305
+        },
+        "flops_breakdown": {
+          "seq_len": 128.0,
+          "forward_projection_flops_per_token": 8388608.0,
+          "forward_attention_quadratic_flops_per_token": 524288.0,
+          "forward_total_flops_per_token": 8912896.0,
+          "training_flops_per_token": 26738688.0,
+          "training_attention_quadratic_flops_per_token": 1572864.0,
+          "attention_quadratic_fraction": 0.058823529411764705,
+          "n_params_total": 4273664.0,
+          "n_params_non_embedding": 3159552.0,
+          "flops_6n_total_per_token": 25641984.0,
+          "flops_6n_non_embedding_per_token": 18957312.0,
+          "ratio_to_6nd_total": 1.0427698574338085,
+          "causal_aware": 0.0
+        },
+        "batch_sweep": [
+          {
+            "batch": 1.0,
+            "step_s": 0.0693931250134483,
+            "tokens_per_s": 1844.5631317971884
+          },
+          {
+            "batch": 2.0,
+            "step_s": 0.09910395898623392,
+            "tokens_per_s": 2583.146048035879
+          },
+          {
+            "batch": 4.0,
+            "step_s": 0.15243008296238258,
+            "tokens_per_s": 3358.917019853317
+          },
+          {
+            "batch": 8.0,
+            "step_s": 0.24485666601685807,
+            "tokens_per_s": 4182.03848258515
+          }
+        ],
+        "collectives": null,
+        "profile": {
+          "device": "cpu",
+          "batch": 8,
+          "seq": 128,
+          "active_steps": 1,
+          "total_self_us": 253773.0,
+          "top_ops": [
+            {
+              "name": "aten::mm",
+              "self_us": 115571.0,
+              "self_fraction": 0.45541093812186484,
+              "total_us": 115571.0,
+              "count": 35,
+              "category": "matmul"
+            },
+            {
+              "name": "aten::addmm",
+              "self_us": 38889.0,
+              "self_fraction": 0.15324325282831508,
+              "total_us": 40454.0,
+              "count": 16,
+              "category": "matmul"
+            },
+            {
+              "name": "aten::bmm",
+              "self_us": 16499.0,
+              "self_fraction": 0.06501479668837898,
+              "total_us": 16499.0,
+              "count": 24,
+              "category": "matmul"
+            },
+            {
+              "name": "aten::mul",
+              "self_us": 7553.0,
+              "self_fraction": 0.029762819527688132,
+              "total_us": 8172.0,
+              "count": 44,
+              "category": "elementwise"
+            },
+            {
+              "name": "ProfilerStep*",
+              "self_us": 6923.0,
+              "self_fraction": 0.027280285924822577,
+              "total_us": 253773.0,
+              "count": 1,
+              "category": "other"
+            },
+            {
+              "name": "aten::tanh",
+              "self_us": 6703.0,
+              "self_fraction": 0.026413369428583813,
+              "total_us": 6703.0,
+              "count": 4,
+              "category": "elementwise"
+            },
+            {
+              "name": "aten::copy_",
+              "self_us": 5006.0,
+              "self_fraction": 0.01972629081896025,
+              "total_us": 5006.0,
+              "count": 352,
+              "category": "data movement"
+            },
+            {
+              "name": "aten::_log_softmax_backward_data",
+              "self_us": 4826.0,
+              "self_fraction": 0.01901699550385581,
+              "total_us": 4826.0,
+              "count": 1,
+              "category": "softmax"
+            },
+            {
+              "name": "aten::_log_softmax",
+              "self_us": 3933.0,
+              "self_fraction": 0.015498102635032096,
+              "total_us": 3933.0,
+              "count": 1,
+              "category": "softmax"
+            },
+            {
+              "name": "aten::add_",
+              "self_us": 3684.0,
+              "self_fraction": 0.014516910782470948,
+              "total_us": 4237.0,
+              "count": 120,
+              "category": "elementwise"
+            },
+            {
+              "name": "aten::mul_",
+              "self_us": 3391.0,
+              "self_fraction": 0.013362335630662048,
+              "total_us": 3925.0,
+              "count": 104,
+              "category": "elementwise"
+            },
+            {
+              "name": "aten::_softmax",
+              "self_us": 3157.0,
+              "self_fraction": 0.012440251721026271,
+              "total_us": 3157.0,
+              "count": 4,
+              "category": "softmax"
+            },
+            {
+              "name": "Optimizer.step#AdamW.step",
+              "self_us": 3068.0,
+              "self_fraction": 0.012089544593002408,
+              "total_us": 18427.0,
+              "count": 1,
+              "category": "optimizer"
+            },
+            {
+              "name": "aten::div",
+              "self_us": 2392.0,
+              "self_fraction": 0.009425746631832385,
+              "total_us": 2808.0,
+              "count": 60,
+              "category": "elementwise"
+            },
+            {
+              "name": "aten::add",
+              "self_us": 2346.0,
+              "self_fraction": 0.009244482273527917,
+              "total_us": 2412.0,
+              "count": 18,
+              "category": "elementwise"
+            },
+            {
+              "name": "aten::sum",
+              "self_us": 2198.0,
+              "self_fraction": 0.00866128390333093,
+              "total_us": 2243.0,
+              "count": 17,
+              "category": "reduction"
+            },
+            {
+              "name": "aten::native_layer_norm_backward",
+              "self_us": 2167.0,
+              "self_fraction": 0.00853912748795183,
+              "total_us": 2263.0,
+              "count": 9,
+              "category": "normalization"
+            },
+            {
+              "name": "aten::lerp_",
+              "self_us": 1908.0,
+              "self_fraction": 0.007518530340107104,
+              "total_us": 1908.0,
+              "count": 52,
+              "category": "other"
+            },
+            {
+              "name": "aten::addcmul_",
+              "self_us": 1832.0,
+              "self_fraction": 0.007219050095951894,
+              "total_us": 1832.0,
+              "count": 52,
+              "category": "elementwise"
+            },
+            {
+              "name": "aten::sqrt",
+              "self_us": 1755.0,
+              "self_fraction": 0.006915629322268326,
+              "total_us": 1755.0,
+              "count": 52,
+              "category": "other"
+            }
+          ],
+          "categories": [
+            {
+              "category": "matmul",
+              "self_us": 173117.0,
+              "self_fraction": 0.6821726503607555
+            },
+            {
+              "category": "elementwise",
+              "self_us": 34607.0,
+              "self_fraction": 0.13636990538788601
+            },
+            {
+              "category": "softmax",
+              "self_us": 12621.0,
+              "self_fraction": 0.04973342317740658
+            },
+            {
+              "category": "other",
+              "self_us": 12421.0,
+              "self_fraction": 0.04894531727173498
+            },
+            {
+              "category": "data movement",
+              "self_us": 10198.0,
+              "self_fraction": 0.04018552013019509
+            },
+            {
+              "category": "normalization",
+              "self_us": 3905.0,
+              "self_fraction": 0.01538776780823807
+            },
+            {
+              "category": "optimizer",
+              "self_us": 3193.0,
+              "self_fraction": 0.012582110784047161
+            },
+            {
+              "category": "reduction",
+              "self_us": 2198.0,
+              "self_fraction": 0.00866128390333093
+            },
+            {
+              "category": "allocation",
+              "self_us": 977.0,
+              "self_fraction": 0.0038498973492057864
+            },
+            {
+              "category": "embedding",
+              "self_us": 386.0,
+              "self_fraction": 0.001521044397946196
+            },
+            {
+              "category": "loss",
+              "self_us": 150.0,
+              "self_fraction": 0.0005910794292537031
+            }
+          ],
+          "trace_path": null,
+          "profiler_flops": 27438350336.0,
+          "meta": {
+            "platform": "macOS-10.16-x86_64-i386-64bit",
+            "torch": "2.2.2",
+            "threads": 10,
+            "model_config": {
+              "vocab_size": 4096,
+              "n_positions": 256,
+              "n_layer": 4,
+              "n_head": 4,
+              "n_kv_head": null,
+              "n_embd": 256,
+              "dropout": 0.0,
+              "layer_norm_epsilon": 1e-05,
+              "norm_position": "pre",
+              "pos_embedding": "learned",
+              "tie_weights": true,
+              "activation": "gelu_tanh",
+              "residual_scaled_init": true,
+              "attn_bias": true,
+              "mlp_bias": true,
+              "use_sdpa": false
+            },
+            "note": "self time partitions the step; total time double counts parents"
+          }
+        }
+      },
+      "meta": {
+        "platform": "macOS-10.16-x86_64-i386-64bit",
+        "torch": "2.2.2",
+        "threads": 10,
+        "peak_source": "measured on this machine",
+        "peak_device": "cpu",
+        "peak_device_matches_run_device": true
+      }
+    },
+    {
+      "label": "un-overlapped all-reduce (2 ranks, injected)",
+      "device": "cpu",
+      "shape": {
+        "batch": 2,
+        "seq": 64,
+        "tokens_per_step": 128,
+        "model_config": {
+          "vocab_size": 8192,
+          "n_positions": 256,
+          "n_layer": 4,
+          "n_head": 8,
+          "n_kv_head": null,
+          "n_embd": 512,
+          "dropout": 0.0,
+          "layer_norm_epsilon": 1e-05,
+          "norm_position": "pre",
+          "pos_embedding": "learned",
+          "tie_weights": true,
+          "activation": "gelu_tanh",
+          "residual_scaled_init": true,
+          "attn_bias": true,
+          "mlp_bias": true,
+          "use_sdpa": false
+        },
+        "n_params": 16935936
+      },
+      "throughput": {
+        "step_s": 0.14429574995301664,
+        "compute_s": 0.14418920897878706,
+        "fetch_s": 0.0001065409742295742,
+        "statistic": "minimum over the timed steps",
+        "tokens_per_s": 887.0670136970589,
+        "model_flops_per_step": 13086228480.0,
+        "achieved_flops_per_s_end_to_end": 90690325143.0547,
+        "achieved_flops_per_s_compute_only": 90757335952.40979,
+        "peak_flops_per_s": 274906497181.3807,
+        "mfu_end_to_end": 0.3298951682586756,
+        "mfu_compute_only": 0.3301389268094634,
+        "roofline_ceiling_mfu": 0.9884065255776389,
+        "roofline_ideal_step_s": 0.03648240149633964
+      },
+      "findings": [
+        {
+          "name": "batch too small to saturate",
+          "severity": "critical",
+          "cost_fraction": 0.3851761854768437,
+          "recoverable": true,
+          "headline": "at batch 2 the step reaches 665 tokens/s against 1,081 tokens/s at batch 8, a 39% shortfall",
+          "evidence": {
+            "tokens_per_s_by_batch": {
+              "2": 665,
+              "4": 967,
+              "8": 1081
+            },
+            "best_batch_at_or_above_this_one": 8,
+            "shortfall_fraction": 0.38546079100551933
+          },
+          "recommendation": "raise the micro-batch, or use gradient accumulation to keep the optimiser step amortised over more tokens"
+        },
+        {
+          "name": "memory-bound operator time",
+          "severity": "critical",
+          "cost_fraction": 0.3269321041909238,
+          "recoverable": false,
+          "headline": "32.7% of operator self time is outside the matmul family; the roofline says those ops cannot reach peak arithmetic",
+          "evidence": {
+            "matmul_self_fraction": 0.5911469296926686,
+            "elementwise_self_fraction": 0.2005974218640364,
+            "data movement_self_fraction": 0.04203504340329985,
+            "optimizer_self_fraction": 0.027244842725687134,
+            "ridge_point_flops_per_byte": 2.6065502454148186,
+            "n_memory_bound_ops_in_block": 6
+          },
+          "recommendation": "fuse: these ops are bandwidth-limited, so the win comes from touching memory once (fused LayerNorm, fused attention) rather than from faster arithmetic"
+        },
+        {
+          "name": "exposed collective time (manual_allreduce)",
+          "severity": "significant",
+          "cost_fraction": 0.20323645322126846,
+          "recoverable": true,
+          "headline": "20.3% of the step is all-reduce that is not hidden behind compute; 0% of this arm's collective time does overlap the backward pass",
+          "evidence": {
+            "world_size": 2,
+            "backend": "gloo",
+            "grad_bytes_all_reduced": 67743744,
+            "n_grad_tensors": 52,
+            "step_ms": 271.4030829956755,
+            "step_without_comm_ms": 216.24408301431686,
+            "exposed_comm_ms": 55.15899998135865,
+            "standalone_comm_ms": 33.20558398263529,
+            "standalone_reference_pattern": "per_param",
+            "cost_beyond_standalone_ms": 21.953415998723358,
+            "overlap_fraction": 0.0
+          },
+          "recommendation": "issue the all-reduce from autograd hooks in buckets, the way DDP does, so the gradients of the last layers go on the wire while the first layers are still being differentiated; then size the buckets so there is more than one"
+        },
+        {
+          "name": "dataloader stall",
+          "severity": "healthy",
+          "cost_fraction": 0.0007383514362984664,
+          "recoverable": true,
+          "headline": "0.1% of the step is spent blocked in next(loader) with the device idle (0.1 ms fetch vs 144.2 ms compute)",
+          "evidence": {
+            "fetch_ms": 0.1065409742295742,
+            "compute_ms": 144.18920897878706,
+            "step_ms": 144.29574995301664,
+            "injected_stall_ms": 0.0,
+            "batches_served": 8
+          },
+          "recommendation": "input pipeline keeps up; nothing to do"
+        }
+      ],
+      "measurements": {
+        "step_breakdown": {
+          "steps": 6,
+          "statistic": "minimum over the timed steps",
+          "fetch_s": [
+            0.0001721670269034803,
+            0.00015566596994176507,
+            0.00011716695735231042,
+            0.0001065409742295742,
+            0.0001093330211006105,
+            0.00011312501737847924
+          ],
+          "compute_s": [
+            0.21648058301070705,
+            0.23680975002935156,
+            0.21662187500623986,
+            0.23807179200230166,
+            0.22657520801294595,
+            0.14418920897878706
+          ],
+          "best_fetch_s": 0.0001065409742295742,
+          "best_compute_s": 0.14418920897878706,
+          "best_step_s": 0.14429574995301664,
+          "median_fetch_s": 0.00011514598736539483,
+          "median_compute_s": 0.2215985415095929,
+          "stall_fraction": 0.0007383514362984664
+        },
+        "flops_breakdown": {
+          "seq_len": 64.0,
+          "forward_projection_flops_per_token": 33554432.0,
+          "forward_attention_quadratic_flops_per_token": 524288.0,
+          "forward_total_flops_per_token": 34078720.0,
+          "training_flops_per_token": 102236160.0,
+          "training_attention_quadratic_flops_per_token": 1572864.0,
+          "attention_quadratic_fraction": 0.015384615384615385,
+          "n_params_total": 16935936.0,
+          "n_params_non_embedding": 12610560.0,
+          "flops_6n_total_per_token": 101615616.0,
+          "flops_6n_non_embedding_per_token": 75663360.0,
+          "ratio_to_6nd_total": 1.0061067779188584,
+          "causal_aware": 0.0
+        },
+        "batch_sweep": [
+          {
+            "batch": 2.0,
+            "step_s": 0.19260762498015538,
+            "tokens_per_s": 664.5635135846154
+          },
+          {
+            "batch": 4.0,
+            "step_s": 0.2648611660115421,
+            "tokens_per_s": 966.544110089903
+          },
+          {
+            "batch": 8.0,
+            "step_s": 0.473459750006441,
+            "tokens_per_s": 1081.4013229066138
+          }
+        ],
+        "collectives": {
+          "world_size": 2,
+          "backend": "gloo",
+          "transport": "loopback TCP on one host; a shared-memory number, not an interconnect measurement",
+          "statistic": "minimum over round-robin timed steps",
+          "n_grad_elements": 16935936,
+          "n_grad_tensors": 52,
+          "grad_bytes": 67743744,
+          "median_step_s": {
+            "no_comm": 0.23281708400463685,
+            "manual_allreduce": 0.28546450001886114,
+            "ddp_default_buckets": 0.2730303749558516,
+            "ddp_small_buckets": 0.26852450001752004
+          },
+          "best_step_s": {
+            "no_comm": 0.21624408301431686,
+            "manual_allreduce": 0.2714030829956755,
+            "ddp_default_buckets": 0.24337695899885148,
+            "ddp_small_buckets": 0.23999616596847773
+          },
+          "standalone_s": {
+            "flat": 0.03366391599411145,
+            "per_param": 0.03320558398263529,
+            "chunks_1mb": 0.034607999958097935
+          },
+          "standalone_allreduce_bytes_per_s": 2012354831.56059,
+          "samples": {
+            "no_comm": [
+              0.24090237502241507,
+              0.22122887504519895,
+              0.25367741700029,
+              0.2450575410039164,
+              0.22885845799464732,
+              0.23180616699391976,
+              0.22665666695684195,
+              0.23281708400463685,
+              0.21906283299904317,
+              0.21624408301431686,
+              0.2612184169702232,
+              0.5570409170468338,
+              0.2348994169733487,
+              0.22017158300150186,
+              0.24065108399372548
+            ],
+            "manual_allreduce": [
+              0.27847691701026633,
+              0.2813815830159001,
+              0.31451629201183096,
+              0.27895487495698035,
+              0.2763802499976009,
+              0.33892579103121534,
+              0.2900230420054868,
+              0.28546450001886114,
+              0.2714030829956755,
+              0.3005617919843644,
+              0.3351376669597812,
+              0.44833395804744214,
+              0.3101985829998739,
+              0.2775582500034943,
+              0.28352937498129904
+            ],
+            "ddp_default_buckets": [
+              0.2560888329753652,
+              0.2955216249683872,
+              0.3011820830288343,
+              0.2623695840011351,
+              0.28374425001675263,
+              0.2768720830208622,
+              0.2705102920299396,
+              0.25390970800071955,
+              0.24750083300750703,
+              0.2730303749558516,
+              0.36600754101527855,
+              0.45346708298893645,
+              0.26345279201632366,
+              0.24337695899885148,
+              0.2831221250235103
+            ],
+            "ddp_small_buckets": [
+              0.26852450001752004,
+              0.25114370899973437,
+              0.2558658750494942,
+              0.28738345904275775,
+              0.27019316697260365,
+              0.25254083395702764,
+              0.2542216249858029,
+              0.29092195798875764,
+              0.2667961670085788,
+              0.2583677920047194,
+              0.41191120800795034,
+              0.2796617079875432,
+              0.3074398330063559,
+              0.23999616596847773,
+              0.40762025001458824
+            ],
+            "standalone_flat": [
+              0.03437070798827335,
+              0.03897366701858118,
+              0.036758125002961606,
+              0.03829887497704476,
+              0.040928667003754526,
+              0.03720225003780797,
+              0.037370875012129545,
+              0.0362749170162715,
+              0.0343791670165956,
+              0.037774958997033536,
+              0.03855304204626009,
+              0.03366391599411145,
+              0.0371199999935925,
+              0.04060045798541978,
+              0.04190508299507201
+            ],
+            "standalone_per_param": [
+              0.03656074998434633,
+              0.03361799998674542,
+              0.044413416006136686,
+              0.03525720798643306,
+              0.04711566702462733,
+              0.040062832995317876,
+              0.04748504201415926,
+              0.03715537500102073,
+              0.03353966702707112,
+              0.04804708302253857,
+              0.03829195903381333,
+              0.03687625000020489,
+              0.041984666022472084,
+              0.03320558398263529,
+              0.05238258297322318
+            ],
+            "standalone_chunks_1mb": [
+              0.035101624962408096,
+              0.034607999958097935,
+              0.0483332920121029,
+              0.03645637503359467,
+              0.0376769169815816,
+              0.0355997079750523,
+              0.0457595830084756,
+              0.040080874983686954,
+              0.036524707975331694,
+              0.037900540977716446,
+              0.04673400003230199,
+              0.04098762501962483,
+              0.036300874955486506,
+              0.03480820800177753,
+              0.06426695798290893
+            ]
+          },
+          "manual_allreduce": {
+            "reference_pattern": "per_param",
+            "standalone_comm_s": 0.03320558398263529,
+            "exposed_comm_s": 0.05515899998135865,
+            "exposed_fraction_of_step": 0.20323645322126846,
+            "overlap_fraction": 0.0,
+            "cost_beyond_standalone_s": 0.021953415998723358,
+            "step_s": 0.2714030829956755,
+            "step_without_comm_s": 0.21624408301431686
+          },
+          "ddp_default_buckets": {
+            "reference_pattern": "flat",
+            "standalone_comm_s": 0.03366391599411145,
+            "exposed_comm_s": 0.02713287598453462,
+            "exposed_fraction_of_step": 0.11148498237527352,
+            "overlap_fraction": 0.19400713840657302,
+            "cost_beyond_standalone_s": -0.006531040009576827,
+            "step_s": 0.24337695899885148,
+            "step_without_comm_s": 0.21624408301431686
+          },
+          "ddp_small_buckets": {
+            "reference_pattern": "chunks_1mb",
+            "standalone_comm_s": 0.034607999958097935,
+            "exposed_comm_s": 0.02375208295416087,
+            "exposed_fraction_of_step": 0.09896859334528113,
+            "overlap_fraction": 0.3136822993839864,
+            "cost_beyond_standalone_s": -0.010855917003937066,
+            "step_s": 0.23999616596847773,
+            "step_without_comm_s": 0.21624408301431686
+          }
+        },
+        "profile": {
+          "device": "cpu",
+          "batch": 2,
+          "seq": 64,
+          "active_steps": 1,
+          "total_self_us": 199524.0,
+          "top_ops": [
+            {
+              "name": "aten::mm",
+              "self_us": 79912.0,
+              "self_fraction": 0.4005132214670917,
+              "total_us": 79912.0,
+              "count": 35,
+              "category": "matmul"
+            },
+            {
+              "name": "aten::addmm",
+              "self_us": 30832.0,
+              "self_fraction": 0.15452777610713497,
+              "total_us": 31512.0,
+              "count": 16,
+              "category": "matmul"
+            },
+            {
+              "name": "aten::add_",
+              "self_us": 6897.0,
+              "self_fraction": 0.03456727010284477,
+              "total_us": 7800.0,
+              "count": 120,
+              "category": "elementwise"
+            },
+            {
+              "name": "ProfilerStep*",
+              "self_us": 6782.0,
+              "self_fraction": 0.03399089833804455,
+              "total_us": 199519.0,
+              "count": 1,
+              "category": "other"
+            },
+            {
+              "name": "aten::div",
+              "self_us": 6465.0,
+              "self_fraction": 0.03240211703855175,
+              "total_us": 7095.0,
+              "count": 60,
+              "category": "elementwise"
+            },
+            {
+              "name": "Optimizer.step#AdamW.step",
+              "self_us": 5268.0,
+              "self_fraction": 0.02640283875623985,
+              "total_us": 38580.0,
+              "count": 1,
+              "category": "optimizer"
+            },
+            {
+              "name": "aten::bmm",
+              "self_us": 4884.0,
+              "self_fraction": 0.024478258254646057,
+              "total_us": 4884.0,
+              "count": 24,
+              "category": "matmul"
+            },
+            {
+              "name": "aten::mul_",
+              "self_us": 4671.0,
+              "self_fraction": 0.02341071750766825,
+              "total_us": 5516.0,
+              "count": 104,
+              "category": "elementwise"
+            },
+            {
+              "name": "aten::add",
+              "self_us": 4544.0,
+              "self_fraction": 0.02277420260219322,
+              "total_us": 4618.0,
+              "count": 18,
+              "category": "elementwise"
+            },
+            {
+              "name": "aten::addcdiv_",
+              "self_us": 4451.0,
+              "self_fraction": 0.022308093261963473,
+              "total_us": 4451.0,
+              "count": 52,
+              "category": "elementwise"
+            },
+            {
+              "name": "aten::lerp_",
+              "self_us": 4311.0,
+              "self_fraction": 0.02160642328742407,
+              "total_us": 4311.0,
+              "count": 52,
+              "category": "other"
+            },
+            {
+              "name": "aten::mul",
+              "self_us": 3757.0,
+              "self_fraction": 0.01882981495960386,
+              "total_us": 4128.0,
+              "count": 44,
+              "category": "elementwise"
+            },
+            {
+              "name": "aten::tanh",
+              "self_us": 3389.0,
+              "self_fraction": 0.01698542531224314,
+              "total_us": 3389.0,
+              "count": 4,
+              "category": "elementwise"
+            },
+            {
+              "name": "aten::addcmul_",
+              "self_us": 3068.0,
+              "self_fraction": 0.015376596299192077,
+              "total_us": 3068.0,
+              "count": 52,
+              "category": "elementwise"
+            },
+            {
+              "name": "aten::sqrt",
+              "self_us": 2865.0,
+              "self_fraction": 0.014359174836109942,
+              "total_us": 2865.0,
+              "count": 52,
+              "category": "other"
+            },
+            {
+              "name": "aten::copy_",
+              "self_us": 2845.0,
+              "self_fraction": 0.014258936268318598,
+              "total_us": 2845.0,
+              "count": 352,
+              "category": "data movement"
+            },
+            {
+              "name": "aten::_log_softmax",
+              "self_us": 2768.0,
+              "self_fraction": 0.013873017782321926,
+              "total_us": 2768.0,
+              "count": 1,
+              "category": "softmax"
+            },
+            {
+              "name": "aten::sum",
+              "self_us": 1459.0,
+              "self_fraction": 0.007312403520378501,
+              "total_us": 1556.0,
+              "count": 17,
+              "category": "reduction"
+            },
+            {
+              "name": "aten::_to_copy",
+              "self_us": 1441.0,
+              "self_fraction": 0.007222188809366292,
+              "total_us": 2228.0,
+              "count": 300,
+              "category": "data movement"
+            },
+            {
+              "name": "aten::_softmax",
+              "self_us": 1117.0,
+              "self_fraction": 0.005598324011146529,
+              "total_us": 1117.0,
+              "count": 4,
+              "category": "softmax"
+            }
+          ],
+          "categories": [
+            {
+              "category": "matmul",
+              "self_us": 117948.0,
+              "self_fraction": 0.5911469296926686
+            },
+            {
+              "category": "elementwise",
+              "self_us": 40024.0,
+              "self_fraction": 0.2005974218640364
+            },
+            {
+              "category": "other",
+              "self_us": 16297.0,
+              "self_fraction": 0.08167939696477616
+            },
+            {
+              "category": "data movement",
+              "self_us": 8387.0,
+              "self_fraction": 0.04203504340329985
+            },
+            {
+              "category": "optimizer",
+              "self_us": 5436.0,
+              "self_fraction": 0.027244842725687134
+            },
+            {
+              "category": "softmax",
+              "self_us": 5115.0,
+              "self_fraction": 0.025636013712636074
+            },
+            {
+              "category": "normalization",
+              "self_us": 2175.0,
+              "self_fraction": 0.010900944247308595
+            },
+            {
+              "category": "allocation",
+              "self_us": 1558.0,
+              "self_fraction": 0.007808584430945651
+            },
+            {
+              "category": "reduction",
+              "self_us": 1459.0,
+              "self_fraction": 0.007312403520378501
+            },
+            {
+              "category": "embedding",
+              "self_us": 1004.0,
+              "self_fraction": 0.005031976103125438
+            },
+            {
+              "category": "loss",
+              "self_us": 121.0,
+              "self_fraction": 0.0006064433351376275
+            }
+          ],
+          "trace_path": null,
+          "profiler_flops": 13104644096.0,
+          "meta": {
+            "platform": "macOS-10.16-x86_64-i386-64bit",
+            "torch": "2.2.2",
+            "threads": 10,
+            "model_config": {
+              "vocab_size": 8192,
+              "n_positions": 256,
+              "n_layer": 4,
+              "n_head": 8,
+              "n_kv_head": null,
+              "n_embd": 512,
+              "dropout": 0.0,
+              "layer_norm_epsilon": 1e-05,
+              "norm_position": "pre",
+              "pos_embedding": "learned",
+              "tie_weights": true,
+              "activation": "gelu_tanh",
+              "residual_scaled_init": true,
+              "attn_bias": true,
+              "mlp_bias": true,
+              "use_sdpa": false
+            },
+            "note": "self time partitions the step; total time double counts parents"
+          }
+        }
+      },
+      "meta": {
+        "platform": "macOS-10.16-x86_64-i386-64bit",
+        "torch": "2.2.2",
+        "threads": 10,
+        "peak_source": "measured on this machine",
+        "peak_device": "cpu",
+        "peak_device_matches_run_device": true
+      }
+    },
+    {
+      "label": "overlapped all-reduce (DDP, 1 MB buckets)",
+      "device": "cpu",
+      "shape": {
+        "batch": 2,
+        "seq": 64,
+        "tokens_per_step": 128,
+        "model_config": {
+          "vocab_size": 8192,
+          "n_positions": 256,
+          "n_layer": 4,
+          "n_head": 8,
+          "n_kv_head": null,
+          "n_embd": 512,
+          "dropout": 0.0,
+          "layer_norm_epsilon": 1e-05,
+          "norm_position": "pre",
+          "pos_embedding": "learned",
+          "tie_weights": true,
+          "activation": "gelu_tanh",
+          "residual_scaled_init": true,
+          "attn_bias": true,
+          "mlp_bias": true,
+          "use_sdpa": false
+        },
+        "n_params": 16935936
+      },
+      "throughput": {
+        "step_s": 0.18222775001777336,
+        "compute_s": 0.18211908300872892,
+        "fetch_s": 0.0001086670090444386,
+        "statistic": "minimum over the timed steps",
+        "tokens_per_s": 702.4177162233286,
+        "model_flops_per_step": 13086228480.0,
+        "achieved_flops_per_s_end_to_end": 71812490022.64282,
+        "achieved_flops_per_s_compute_only": 71855339175.9214,
+        "peak_flops_per_s": 274906497181.3807,
+        "mfu_end_to_end": 0.2612251465823364,
+        "mfu_compute_only": 0.26138101468191904,
+        "roofline_ceiling_mfu": 0.9884065255776389,
+        "roofline_ideal_step_s": 0.03648240149633964
+      },
+      "findings": [
+        {
+          "name": "batch too small to saturate",
+          "severity": "critical",
+          "cost_fraction": 0.6171346086331303,
+          "recoverable": true,
+          "headline": "at batch 2 the step reaches 544 tokens/s against 1,421 tokens/s at batch 8, a 62% shortfall",
+          "evidence": {
+            "tokens_per_s_by_batch": {
+              "2": 544,
+              "4": 1036,
+              "8": 1421
+            },
+            "best_batch_at_or_above_this_one": 8,
+            "shortfall_fraction": 0.6175028411708197
+          },
+          "recommendation": "raise the micro-batch, or use gradient accumulation to keep the optimiser step amortised over more tokens"
+        },
+        {
+          "name": "memory-bound operator time",
+          "severity": "critical",
+          "cost_fraction": 0.3480178182539134,
+          "recoverable": false,
+          "headline": "34.8% of operator self time is outside the matmul family; the roofline says those ops cannot reach peak arithmetic",
+          "evidence": {
+            "matmul_self_fraction": 0.5744482219792618,
+            "elementwise_self_fraction": 0.22159485190232991,
+            "data movement_self_fraction": 0.03864068654615166,
+            "softmax_self_fraction": 0.029437313723434527,
+            "ridge_point_flops_per_byte": 2.6065502454148186,
+            "n_memory_bound_ops_in_block": 6
+          },
+          "recommendation": "fuse: these ops are bandwidth-limited, so the win comes from touching memory once (fused LayerNorm, fused attention) rather than from faster arithmetic"
+        },
+        {
+          "name": "exposed collective time (ddp_small_buckets)",
+          "severity": "minor",
+          "cost_fraction": 0.09896859334528113,
+          "recoverable": true,
+          "headline": "9.9% of the step is all-reduce that is not hidden behind compute; 31% of this arm's collective time does overlap the backward pass",
+          "evidence": {
+            "world_size": 2,
+            "backend": "gloo",
+            "grad_bytes_all_reduced": 67743744,
+            "n_grad_tensors": 52,
+            "step_ms": 239.99616596847773,
+            "step_without_comm_ms": 216.24408301431686,
+            "exposed_comm_ms": 23.75208295416087,
+            "standalone_comm_ms": 34.607999958097935,
+            "standalone_reference_pattern": "chunks_1mb",
+            "cost_beyond_standalone_ms": -10.855917003937066,
+            "overlap_fraction": 0.3136822993839864
+          },
+          "recommendation": "issue the all-reduce from autograd hooks in buckets, the way DDP does, so the gradients of the last layers go on the wire while the first layers are still being differentiated; then size the buckets so there is more than one"
+        },
+        {
+          "name": "dataloader stall",
+          "severity": "healthy",
+          "cost_fraction": 0.0005963252525141747,
+          "recoverable": true,
+          "headline": "0.1% of the step is spent blocked in next(loader) with the device idle (0.1 ms fetch vs 182.1 ms compute)",
+          "evidence": {
+            "fetch_ms": 0.1086670090444386,
+            "compute_ms": 182.11908300872892,
+            "step_ms": 182.22775001777336,
+            "injected_stall_ms": 0.0,
+            "batches_served": 8
+          },
+          "recommendation": "input pipeline keeps up; nothing to do"
+        }
+      ],
+      "measurements": {
+        "step_breakdown": {
+          "steps": 6,
+          "statistic": "minimum over the timed steps",
+          "fetch_s": [
+            0.00011491600889712572,
+            0.00011016702046617866,
+            0.00010904099326580763,
+            0.00015908305067569017,
+            0.0001086670090444386,
+            0.00011845899280160666
+          ],
+          "compute_s": [
+            0.20452837500488386,
+            0.19474104198161513,
+            0.22950179199688137,
+            0.2579329169820994,
+            0.2618367919931188,
+            0.18211908300872892
+          ],
+          "best_fetch_s": 0.0001086670090444386,
+          "best_compute_s": 0.18211908300872892,
+          "best_step_s": 0.18222775001777336,
+          "median_fetch_s": 0.00011254151468165219,
+          "median_compute_s": 0.2170150835008826,
+          "stall_fraction": 0.0005963252525141747
+        },
+        "flops_breakdown": {
+          "seq_len": 64.0,
+          "forward_projection_flops_per_token": 33554432.0,
+          "forward_attention_quadratic_flops_per_token": 524288.0,
+          "forward_total_flops_per_token": 34078720.0,
+          "training_flops_per_token": 102236160.0,
+          "training_attention_quadratic_flops_per_token": 1572864.0,
+          "attention_quadratic_fraction": 0.015384615384615385,
+          "n_params_total": 16935936.0,
+          "n_params_non_embedding": 12610560.0,
+          "flops_6n_total_per_token": 101615616.0,
+          "flops_6n_non_embedding_per_token": 75663360.0,
+          "ratio_to_6nd_total": 1.0061067779188584,
+          "causal_aware": 0.0
+        },
+        "batch_sweep": [
+          {
+            "batch": 2.0,
+            "step_s": 0.2354197499807924,
+            "tokens_per_s": 543.7096930501513
+          },
+          {
+            "batch": 4.0,
+            "step_s": 0.24709454097319394,
+            "tokens_per_s": 1036.0406951595592
+          },
+          {
+            "batch": 8.0,
+            "step_s": 0.3601895419997163,
+            "tokens_per_s": 1421.473808366161
+          }
+        ],
+        "collectives": {
+          "world_size": 2,
+          "backend": "gloo",
+          "transport": "loopback TCP on one host; a shared-memory number, not an interconnect measurement",
+          "statistic": "minimum over round-robin timed steps",
+          "n_grad_elements": 16935936,
+          "n_grad_tensors": 52,
+          "grad_bytes": 67743744,
+          "median_step_s": {
+            "no_comm": 0.23281708400463685,
+            "manual_allreduce": 0.28546450001886114,
+            "ddp_default_buckets": 0.2730303749558516,
+            "ddp_small_buckets": 0.26852450001752004
+          },
+          "best_step_s": {
+            "no_comm": 0.21624408301431686,
+            "manual_allreduce": 0.2714030829956755,
+            "ddp_default_buckets": 0.24337695899885148,
+            "ddp_small_buckets": 0.23999616596847773
+          },
+          "standalone_s": {
+            "flat": 0.03366391599411145,
+            "per_param": 0.03320558398263529,
+            "chunks_1mb": 0.034607999958097935
+          },
+          "standalone_allreduce_bytes_per_s": 2012354831.56059,
+          "samples": {
+            "no_comm": [
+              0.24090237502241507,
+              0.22122887504519895,
+              0.25367741700029,
+              0.2450575410039164,
+              0.22885845799464732,
+              0.23180616699391976,
+              0.22665666695684195,
+              0.23281708400463685,
+              0.21906283299904317,
+              0.21624408301431686,
+              0.2612184169702232,
+              0.5570409170468338,
+              0.2348994169733487,
+              0.22017158300150186,
+              0.24065108399372548
+            ],
+            "manual_allreduce": [
+              0.27847691701026633,
+              0.2813815830159001,
+              0.31451629201183096,
+              0.27895487495698035,
+              0.2763802499976009,
+              0.33892579103121534,
+              0.2900230420054868,
+              0.28546450001886114,
+              0.2714030829956755,
+              0.3005617919843644,
+              0.3351376669597812,
+              0.44833395804744214,
+              0.3101985829998739,
+              0.2775582500034943,
+              0.28352937498129904
+            ],
+            "ddp_default_buckets": [
+              0.2560888329753652,
+              0.2955216249683872,
+              0.3011820830288343,
+              0.2623695840011351,
+              0.28374425001675263,
+              0.2768720830208622,
+              0.2705102920299396,
+              0.25390970800071955,
+              0.24750083300750703,
+              0.2730303749558516,
+              0.36600754101527855,
+              0.45346708298893645,
+              0.26345279201632366,
+              0.24337695899885148,
+              0.2831221250235103
+            ],
+            "ddp_small_buckets": [
+              0.26852450001752004,
+              0.25114370899973437,
+              0.2558658750494942,
+              0.28738345904275775,
+              0.27019316697260365,
+              0.25254083395702764,
+              0.2542216249858029,
+              0.29092195798875764,
+              0.2667961670085788,
+              0.2583677920047194,
+              0.41191120800795034,
+              0.2796617079875432,
+              0.3074398330063559,
+              0.23999616596847773,
+              0.40762025001458824
+            ],
+            "standalone_flat": [
+              0.03437070798827335,
+              0.03897366701858118,
+              0.036758125002961606,
+              0.03829887497704476,
+              0.040928667003754526,
+              0.03720225003780797,
+              0.037370875012129545,
+              0.0362749170162715,
+              0.0343791670165956,
+              0.037774958997033536,
+              0.03855304204626009,
+              0.03366391599411145,
+              0.0371199999935925,
+              0.04060045798541978,
+              0.04190508299507201
+            ],
+            "standalone_per_param": [
+              0.03656074998434633,
+              0.03361799998674542,
+              0.044413416006136686,
+              0.03525720798643306,
+              0.04711566702462733,
+              0.040062832995317876,
+              0.04748504201415926,
+              0.03715537500102073,
+              0.03353966702707112,
+              0.04804708302253857,
+              0.03829195903381333,
+              0.03687625000020489,
+              0.041984666022472084,
+              0.03320558398263529,
+              0.05238258297322318
+            ],
+            "standalone_chunks_1mb": [
+              0.035101624962408096,
+              0.034607999958097935,
+              0.0483332920121029,
+              0.03645637503359467,
+              0.0376769169815816,
+              0.0355997079750523,
+              0.0457595830084756,
+              0.040080874983686954,
+              0.036524707975331694,
+              0.037900540977716446,
+              0.04673400003230199,
+              0.04098762501962483,
+              0.036300874955486506,
+              0.03480820800177753,
+              0.06426695798290893
+            ]
+          },
+          "manual_allreduce": {
+            "reference_pattern": "per_param",
+            "standalone_comm_s": 0.03320558398263529,
+            "exposed_comm_s": 0.05515899998135865,
+            "exposed_fraction_of_step": 0.20323645322126846,
+            "overlap_fraction": 0.0,
+            "cost_beyond_standalone_s": 0.021953415998723358,
+            "step_s": 0.2714030829956755,
+            "step_without_comm_s": 0.21624408301431686
+          },
+          "ddp_default_buckets": {
+            "reference_pattern": "flat",
+            "standalone_comm_s": 0.03366391599411145,
+            "exposed_comm_s": 0.02713287598453462,
+            "exposed_fraction_of_step": 0.11148498237527352,
+            "overlap_fraction": 0.19400713840657302,
+            "cost_beyond_standalone_s": -0.006531040009576827,
+            "step_s": 0.24337695899885148,
+            "step_without_comm_s": 0.21624408301431686
+          },
+          "ddp_small_buckets": {
+            "reference_pattern": "chunks_1mb",
+            "standalone_comm_s": 0.034607999958097935,
+            "exposed_comm_s": 0.02375208295416087,
+            "exposed_fraction_of_step": 0.09896859334528113,
+            "overlap_fraction": 0.3136822993839864,
+            "cost_beyond_standalone_s": -0.010855917003937066,
+            "step_s": 0.23999616596847773,
+            "step_without_comm_s": 0.21624408301431686
+          }
+        },
+        "profile": {
+          "device": "cpu",
+          "batch": 2,
+          "seq": 64,
+          "active_steps": 1,
+          "total_self_us": 400614.0,
+          "top_ops": [
+            {
+              "name": "aten::mm",
+              "self_us": 177477.0,
+              "self_fraction": 0.44301247584957093,
+              "total_us": 177477.0,
+              "count": 35,
+              "category": "matmul"
+            },
+            {
+              "name": "aten::addmm",
+              "self_us": 39462.0,
+              "self_fraction": 0.09850379667210832,
+              "total_us": 40295.0,
+              "count": 16,
+              "category": "matmul"
+            },
+            {
+              "name": "aten::mul_",
+              "self_us": 18634.0,
+              "self_fraction": 0.04651360162151098,
+              "total_us": 19513.0,
+              "count": 104,
+              "category": "elementwise"
+            },
+            {
+              "name": "aten::addcmul_",
+              "self_us": 14379.0,
+              "self_fraction": 0.03589240515808234,
+              "total_us": 14379.0,
+              "count": 52,
+              "category": "elementwise"
+            },
+            {
+              "name": "aten::addcdiv_",
+              "self_us": 13155.0,
+              "self_fraction": 0.032837095059084304,
+              "total_us": 13155.0,
+              "count": 52,
+              "category": "elementwise"
+            },
+            {
+              "name": "aten::add_",
+              "self_us": 12751.0,
+              "self_fraction": 0.03182864303294443,
+              "total_us": 13894.0,
+              "count": 120,
+              "category": "elementwise"
+            },
+            {
+              "name": "aten::lerp_",
+              "self_us": 10885.0,
+              "self_fraction": 0.027170792833001344,
+              "total_us": 10885.0,
+              "count": 52,
+              "category": "other"
+            },
+            {
+              "name": "aten::sqrt",
+              "self_us": 10853.0,
+              "self_fraction": 0.027090915444792245,
+              "total_us": 10853.0,
+              "count": 52,
+              "category": "other"
+            },
+            {
+              "name": "aten::bmm",
+              "self_us": 10258.0,
+              "self_fraction": 0.02560569525777931,
+              "total_us": 10258.0,
+              "count": 24,
+              "category": "matmul"
+            },
+            {
+              "name": "aten::div",
+              "self_us": 9455.0,
+              "self_fraction": 0.02360127204740723,
+              "total_us": 10286.0,
+              "count": 60,
+              "category": "elementwise"
+            },
+            {
+              "name": "aten::copy_",
+              "self_us": 7806.0,
+              "self_fraction": 0.019485090386257096,
+              "total_us": 7806.0,
+              "count": 352,
+              "category": "data movement"
+            },
+            {
+              "name": "aten::mul",
+              "self_us": 7386.0,
+              "self_fraction": 0.01843669966601267,
+              "total_us": 7761.0,
+              "count": 44,
+              "category": "elementwise"
+            },
+            {
+              "name": "aten::native_layer_norm_backward",
+              "self_us": 6612.0,
+              "self_fraction": 0.016504665338705087,
+              "total_us": 6736.0,
+              "count": 9,
+              "category": "normalization"
+            },
+            {
+              "name": "ProfilerStep*",
+              "self_us": 6549.0,
+              "self_fraction": 0.016347406730668423,
+              "total_us": 400614.0,
+              "count": 1,
+              "category": "other"
+            },
+            {
+              "name": "Optimizer.step#AdamW.step",
+              "self_us": 6506.0,
+              "self_fraction": 0.016240071490262447,
+              "total_us": 93866.0,
+              "count": 1,
+              "category": "optimizer"
+            },
+            {
+              "name": "aten::_softmax_backward_data",
+              "self_us": 6210.0,
+              "self_fraction": 0.015501205649328281,
+              "total_us": 6210.0,
+              "count": 4,
+              "category": "softmax"
+            },
+            {
+              "name": "aten::add",
+              "self_us": 5255.0,
+              "self_fraction": 0.013117364844962983,
+              "total_us": 5287.0,
+              "count": 18,
+              "category": "elementwise"
+            },
+            {
+              "name": "aten::sum",
+              "self_us": 4444.0,
+              "self_fraction": 0.011092972287538628,
+              "total_us": 4584.0,
+              "count": 17,
+              "category": "reduction"
+            },
+            {
+              "name": "aten::_log_softmax_backward_data",
+              "self_us": 2440.0,
+              "self_fraction": 0.006090650850943801,
+              "total_us": 2440.0,
+              "count": 1,
+              "category": "softmax"
+            },
+            {
+              "name": "aten::cat",
+              "self_us": 2412.0,
+              "self_fraction": 0.00602075813626084,
+              "total_us": 2502.0,
+              "count": 4,
+              "category": "data movement"
+            }
+          ],
+          "categories": [
+            {
+              "category": "matmul",
+              "self_us": 230132.0,
+              "self_fraction": 0.5744482219792618
+            },
+            {
+              "category": "elementwise",
+              "self_us": 88774.0,
+              "self_fraction": 0.22159485190232991
+            },
+            {
+              "category": "other",
+              "self_us": 30978.0,
+              "self_fraction": 0.07732630412317093
+            },
+            {
+              "category": "data movement",
+              "self_us": 15480.0,
+              "self_fraction": 0.03864068654615166
+            },
+            {
+              "category": "softmax",
+              "self_us": 11793.0,
+              "self_fraction": 0.029437313723434527
+            },
+            {
+              "category": "normalization",
+              "self_us": 7707.0,
+              "self_fraction": 0.019237969716485195
+            },
+            {
+              "category": "optimizer",
+              "self_us": 6652.0,
+              "self_fraction": 0.01660451207396646
+            },
+            {
+              "category": "reduction",
+              "self_us": 4444.0,
+              "self_fraction": 0.011092972287538628
+            },
+            {
+              "category": "allocation",
+              "self_us": 2475.0,
+              "self_fraction": 0.0061780167442975036
+            },
+            {
+              "category": "embedding",
+              "self_us": 2086.0,
+              "self_fraction": 0.005207007243880644
+            },
+            {
+              "category": "loss",
+              "self_us": 93.0,
+              "self_fraction": 0.00023214365948269407
+            }
+          ],
+          "trace_path": null,
+          "profiler_flops": 13104644096.0,
+          "meta": {
+            "platform": "macOS-10.16-x86_64-i386-64bit",
+            "torch": "2.2.2",
+            "threads": 10,
+            "model_config": {
+              "vocab_size": 8192,
+              "n_positions": 256,
+              "n_layer": 4,
+              "n_head": 8,
+              "n_kv_head": null,
+              "n_embd": 512,
+              "dropout": 0.0,
+              "layer_norm_epsilon": 1e-05,
+              "norm_position": "pre",
+              "pos_embedding": "learned",
+              "tie_weights": true,
+              "activation": "gelu_tanh",
+              "residual_scaled_init": true,
+              "attn_bias": true,
+              "mlp_bias": true,
+              "use_sdpa": false
+            },
+            "note": "self time partitions the step; total time double counts parents"
+          }
+        }
+      },
+      "meta": {
+        "platform": "macOS-10.16-x86_64-i386-64bit",
+        "torch": "2.2.2",
+        "threads": 10,
+        "peak_source": "measured on this machine",
+        "peak_device": "cpu",
+        "peak_device_matches_run_device": true
+      }
+    },
+    {
+      "label": "batch too small (batch 1, injected)",
+      "device": "cpu",
+      "shape": {
+        "batch": 1,
+        "seq": 128,
+        "tokens_per_step": 128,
+        "model_config": {
+          "vocab_size": 4096,
+          "n_positions": 256,
+          "n_layer": 4,
+          "n_head": 4,
+          "n_kv_head": null,
+          "n_embd": 256,
+          "dropout": 0.0,
+          "layer_norm_epsilon": 1e-05,
+          "norm_position": "pre",
+          "pos_embedding": "learned",
+          "tie_weights": true,
+          "activation": "gelu_tanh",
+          "residual_scaled_init": true,
+          "attn_bias": true,
+          "mlp_bias": true,
+          "use_sdpa": false
+        },
+        "n_params": 4273664
+      },
+      "throughput": {
+        "step_s": 0.05814258300233632,
+        "compute_s": 0.05806949996622279,
+        "fetch_s": 7.30830361135304e-05,
+        "statistic": "minimum over the timed steps",
+        "tokens_per_s": 2201.484581358496,
+        "model_flops_per_step": 3422552064.0,
+        "achieved_flops_per_s_end_to_end": 58864809357.75545,
+        "achieved_flops_per_s_compute_only": 58938893325.94204,
+        "peak_flops_per_s": 274906497181.3807,
+        "mfu_end_to_end": 0.21412665746825552,
+        "mfu_compute_only": 0.2143961453448469,
+        "roofline_ceiling_mfu": 0.9765162310636999,
+        "roofline_ideal_step_s": 0.009849051659065468
+      },
+      "findings": [
+        {
+          "name": "batch too small to saturate",
+          "severity": "critical",
+          "cost_fraction": 0.6431663691704023,
+          "recoverable": true,
+          "headline": "at batch 1 the step reaches 1,987 tokens/s against 5,581 tokens/s at batch 16, a 64% shortfall",
+          "evidence": {
+            "tokens_per_s_by_batch": {
+              "1": 1987,
+              "2": 2079,
+              "4": 3223,
+              "8": 4538,
+              "16": 5581
+            },
+            "best_batch_at_or_above_this_one": 16,
+            "shortfall_fraction": 0.6439758225153154
+          },
+          "recommendation": "raise the micro-batch, or use gradient accumulation to keep the optimiser step amortised over more tokens"
+        },
+        {
+          "name": "memory-bound operator time",
+          "severity": "critical",
+          "cost_fraction": 0.4173856077210051,
+          "recoverable": false,
+          "headline": "41.8% of operator self time is outside the matmul family; the roofline says those ops cannot reach peak arithmetic",
+          "evidence": {
+            "matmul_self_fraction": 0.4532885782412477,
+            "elementwise_self_fraction": 0.23744077284402917,
+            "data movement_self_fraction": 0.05298975613250509,
+            "optimizer_self_fraction": 0.045846679697493786,
+            "ridge_point_flops_per_byte": 2.6065502454148186,
+            "n_memory_bound_ops_in_block": 6
+          },
+          "recommendation": "fuse: these ops are bandwidth-limited, so the win comes from touching memory once (fused LayerNorm, fused attention) rather than from faster arithmetic"
+        },
+        {
+          "name": "dataloader stall",
+          "severity": "healthy",
+          "cost_fraction": 0.001256962321584401,
+          "recoverable": true,
+          "headline": "0.1% of the step is spent blocked in next(loader) with the device idle (0.1 ms fetch vs 58.1 ms compute)",
+          "evidence": {
+            "fetch_ms": 0.0730830361135304,
+            "compute_ms": 58.06949996622279,
+            "step_ms": 58.14258300233632,
+            "injected_stall_ms": 0.0,
+            "batches_served": 8
+          },
+          "recommendation": "input pipeline keeps up; nothing to do"
+        }
+      ],
+      "measurements": {
+        "step_breakdown": {
+          "steps": 6,
+          "statistic": "minimum over the timed steps",
+          "fetch_s": [
+            8.458300726488233e-05,
+            7.30830361135304e-05,
+            0.00010379200102761388,
+            8.566596079617739e-05,
+            8.691701805219054e-05,
+            8.508301107212901e-05
+          ],
+          "compute_s": [
+            0.1398476249887608,
+            0.13215974997729063,
+            0.1315637920051813,
+            0.073486834007781,
+            0.061815708002541214,
+            0.05806949996622279
+          ],
+          "best_fetch_s": 7.30830361135304e-05,
+          "best_compute_s": 0.05806949996622279,
+          "best_step_s": 0.05814258300233632,
+          "median_fetch_s": 8.53744859341532e-05,
+          "median_compute_s": 0.10252531300648116,
+          "stall_fraction": 0.001256962321584401
+        },
+        "flops_breakdown": {
+          "seq_len": 128.0,
+          "forward_projection_flops_per_token": 8388608.0,
+          "forward_attention_quadratic_flops_per_token": 524288.0,
+          "forward_total_flops_per_token": 8912896.0,
+          "training_flops_per_token": 26738688.0,
+          "training_attention_quadratic_flops_per_token": 1572864.0,
+          "attention_quadratic_fraction": 0.058823529411764705,
+          "n_params_total": 4273664.0,
+          "n_params_non_embedding": 3159552.0,
+          "flops_6n_total_per_token": 25641984.0,
+          "flops_6n_non_embedding_per_token": 18957312.0,
+          "ratio_to_6nd_total": 1.0427698574338085,
+          "causal_aware": 0.0
+        },
+        "batch_sweep": [
+          {
+            "batch": 1.0,
+            "step_s": 0.0644157079514116,
+            "tokens_per_s": 1987.0929633584042
+          },
+          {
+            "batch": 2.0,
+            "step_s": 0.12314775004051626,
+            "tokens_per_s": 2078.8037127416023
+          },
+          {
+            "batch": 4.0,
+            "step_s": 0.15884150000056252,
+            "tokens_per_s": 3223.3389888548445
+          },
+          {
+            "batch": 8.0,
+            "step_s": 0.22564733301987872,
+            "tokens_per_s": 4538.054965222165
+          },
+          {
+            "batch": 16.0,
+            "step_s": 0.36693679104791954,
+            "tokens_per_s": 5581.342754296188
+          }
+        ],
+        "collectives": null,
+        "profile": {
+          "device": "cpu",
+          "batch": 1,
+          "seq": 128,
+          "active_steps": 1,
+          "total_self_us": 97717.0,
+          "top_ops": [
+            {
+              "name": "aten::mm",
+              "self_us": 28769.0,
+              "self_fraction": 0.29441141254848185,
+              "total_us": 28769.0,
+              "count": 35,
+              "category": "matmul"
+            },
+            {
+              "name": "aten::addmm",
+              "self_us": 9521.0,
+              "self_fraction": 0.09743442799103534,
+              "total_us": 9967.0,
+              "count": 16,
+              "category": "matmul"
+            },
+            {
+              "name": "ProfilerStep*",
+              "self_us": 5501.0,
+              "self_fraction": 0.056295219869623506,
+              "total_us": 97717.0,
+              "count": 1,
+              "category": "other"
+            },
+            {
+              "name": "aten::mul_",
+              "self_us": 4486.0,
+              "self_fraction": 0.04590808150066007,
+              "total_us": 5112.0,
+              "count": 104,
+              "category": "elementwise"
+            },
+            {
+              "name": "Optimizer.step#AdamW.step",
+              "self_us": 4368.0,
+              "self_fraction": 0.04470051270505644,
+              "total_us": 26113.0,
+              "count": 1,
+              "category": "optimizer"
+            },
+            {
+              "name": "aten::bmm",
+              "self_us": 4265.0,
+              "self_fraction": 0.043646448417368526,
+              "total_us": 4265.0,
+              "count": 24,
+              "category": "matmul"
+            },
+            {
+              "name": "aten::add_",
+              "self_us": 3513.0,
+              "self_fraction": 0.03595075575386064,
+              "total_us": 4225.0,
+              "count": 120,
+              "category": "elementwise"
+            },
+            {
+              "name": "aten::mul",
+              "self_us": 3084.0,
+              "self_fraction": 0.031560526827471166,
+              "total_us": 3405.0,
+              "count": 44,
+              "category": "elementwise"
+            },
+            {
+              "name": "aten::lerp_",
+              "self_us": 2945.0,
+              "self_fraction": 0.030138051720785534,
+              "total_us": 2945.0,
+              "count": 52,
+              "category": "other"
+            },
+            {
+              "name": "aten::addcdiv_",
+              "self_us": 2719.0,
+              "self_fraction": 0.027825250468188747,
+              "total_us": 2719.0,
+              "count": 52,
+              "category": "elementwise"
+            },
+            {
+              "name": "aten::div",
+              "self_us": 2713.0,
+              "self_fraction": 0.02776384866502246,
+              "total_us": 3230.0,
+              "count": 60,
+              "category": "elementwise"
+            },
+            {
+              "name": "aten::sqrt",
+              "self_us": 2484.0,
+              "self_fraction": 0.025420346510842535,
+              "total_us": 2484.0,
+              "count": 52,
+              "category": "other"
+            },
+            {
+              "name": "aten::addcmul_",
+              "self_us": 2229.0,
+              "self_fraction": 0.022810769876275366,
+              "total_us": 2229.0,
+              "count": 52,
+              "category": "elementwise"
+            },
+            {
+              "name": "aten::sum",
+              "self_us": 1423.0,
+              "self_fraction": 0.014562460984270905,
+              "total_us": 1483.0,
+              "count": 17,
+              "category": "reduction"
+            },
+            {
+              "name": "aten::_log_softmax",
+              "self_us": 1377.0,
+              "self_fraction": 0.01409171382666271,
+              "total_us": 1377.0,
+              "count": 1,
+              "category": "softmax"
+            },
+            {
+              "name": "aten::copy_",
+              "self_us": 1373.0,
+              "self_fraction": 0.01405077929121852,
+              "total_us": 1373.0,
+              "count": 336,
+              "category": "data movement"
+            },
+            {
+              "name": "aten::native_layer_norm_backward",
+              "self_us": 1330.0,
+              "self_fraction": 0.013610733035193466,
+              "total_us": 1394.0,
+              "count": 9,
+              "category": "normalization"
+            },
+            {
+              "name": "aten::tanh",
+              "self_us": 1243.0,
+              "self_fraction": 0.012720406889282315,
+              "total_us": 1243.0,
+              "count": 4,
+              "category": "elementwise"
+            },
+            {
+              "name": "aten::_to_copy",
+              "self_us": 1212.0,
+              "self_fraction": 0.012403164239589835,
+              "total_us": 1725.0,
+              "count": 300,
+              "category": "data movement"
+            },
+            {
+              "name": "aten::_log_softmax_backward_data",
+              "self_us": 897.0,
+              "self_fraction": 0.009179569573359804,
+              "total_us": 897.0,
+              "count": 1,
+              "category": "softmax"
+            }
+          ],
+          "categories": [
+            {
+              "category": "matmul",
+              "self_us": 44294.0,
+              "self_fraction": 0.4532885782412477
+            },
+            {
+              "category": "elementwise",
+              "self_us": 23202.0,
+              "self_fraction": 0.23744077284402917
+            },
+            {
+              "category": "other",
+              "self_us": 12586.0,
+              "self_fraction": 0.1288005157751466
+            },
+            {
+              "category": "data movement",
+              "self_us": 5178.0,
+              "self_fraction": 0.05298975613250509
+            },
+            {
+              "category": "optimizer",
+              "self_us": 4480.0,
+              "self_fraction": 0.045846679697493786
+            },
+            {
+              "category": "softmax",
+              "self_us": 3337.0,
+              "self_fraction": 0.03414963619431624
+            },
+            {
+              "category": "normalization",
+              "self_us": 2145.0,
+              "self_fraction": 0.021951144631947358
+            },
+            {
+              "category": "reduction",
+              "self_us": 1423.0,
+              "self_fraction": 0.014562460984270905
+            },
+            {
+              "category": "allocation",
+              "self_us": 679.0,
+              "self_fraction": 0.006948637391651401
+            },
+            {
+              "category": "embedding",
+              "self_us": 273.0,
+              "self_fraction": 0.0027937820440660276
+            },
+            {
+              "category": "loss",
+              "self_us": 120.0,
+              "self_fraction": 0.0012280360633257262
+            }
+          ],
+          "trace_path": null,
+          "profiler_flops": 3430711296.0,
+          "meta": {
+            "platform": "macOS-10.16-x86_64-i386-64bit",
+            "torch": "2.2.2",
+            "threads": 10,
+            "model_config": {
+              "vocab_size": 4096,
+              "n_positions": 256,
+              "n_layer": 4,
+              "n_head": 4,
+              "n_kv_head": null,
+              "n_embd": 256,
+              "dropout": 0.0,
+              "layer_norm_epsilon": 1e-05,
+              "norm_position": "pre",
+              "pos_embedding": "learned",
+              "tie_weights": true,
+              "activation": "gelu_tanh",
+              "residual_scaled_init": true,
+              "attn_bias": true,
+              "mlp_bias": true,
+              "use_sdpa": false
+            },
+            "note": "self time partitions the step; total time double counts parents"
+          }
+        }
+      },
+      "meta": {
+        "platform": "macOS-10.16-x86_64-i386-64bit",
+        "torch": "2.2.2",
+        "threads": 10,
+        "peak_source": "measured on this machine",
+        "peak_device": "cpu",
+        "peak_device_matches_run_device": true
+      }
+    }
+  ],
+  "checks": [
+    {
+      "configuration": "baseline",
+      "injected": "nothing",
+      "passed": true,
+      "detail": "worst recoverable: dataloader stall [healthy] 0.0%"
+    },
+    {
+      "configuration": "slow dataloader",
+      "injected": "+178 ms/batch",
+      "passed": true,
+      "detail": "dataloader stall: critical, 37.1% of step, ranked 1 of 3"
+    },
+    {
+      "configuration": "un-overlapped all-reduce",
+      "injected": "manual_allreduce",
+      "passed": true,
+      "detail": "exposed collective time (manual_allreduce): significant, 20.3% of step, ranked 3 of 4"
+    },
+    {
+      "configuration": "overlap vs no overlap",
+      "injected": "bucketed DDP",
+      "passed": true,
+      "detail": "exposed comm on identical volume (67.7 MB): manual loop 55.2 ms (0% overlapped) vs DDP 25 MB buckets 27.1 ms (19%) and DDP 1 MB buckets 23.8 ms (31%)"
+    },
+    {
+      "configuration": "batch too small",
+      "injected": "batch 1",
+      "passed": true,
+      "detail": "batch too small to saturate: critical, 64.3% of step, ranked 1 of 3"
+    }
+  ],
+  "all_passed": true
+}

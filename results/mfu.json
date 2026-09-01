@@ -1,0 +1,88 @@
+{
+  "device": "mps",
+  "batch": 4,
+  "seq": 256,
+  "steps_timed": 6,
+  "step_s": 0.2545028750319034,
+  "tokens_per_s": 4023.530185549518,
+  "model_flops_per_step": 787971833856.0,
+  "achieved_flops_per_s": 3096121541877.3687,
+  "peak_flops_per_s": 6489104169141.945,
+  "mfu": 0.4771261889430832,
+  "step_times_s": [
+    0.5311098330421373,
+    0.2545028750319034,
+    0.2553353330004029,
+    0.25473724998300895,
+    0.2573646670207381,
+    0.2596474580350332
+  ],
+  "flops_breakdown": {
+    "seq_len": 256.0,
+    "forward_projection_flops_per_token": 247064064.0,
+    "forward_attention_quadratic_flops_per_token": 9437184.0,
+    "forward_total_flops_per_token": 256501248.0,
+    "training_flops_per_token": 769503744.0,
+    "training_attention_quadratic_flops_per_token": 28311552.0,
+    "attention_quadratic_fraction": 0.03679196133969687,
+    "n_params_total": 124439808.0,
+    "n_params_non_embedding": 85056000.0,
+    "flops_6n_total_per_token": 746638848.0,
+    "flops_6n_non_embedding_per_token": 510336000.0,
+    "ratio_to_6nd_total": 1.0306237695255847,
+    "causal_aware": 0.0
+  },
+  "modelled_gpu_mfu": [
+    {
+      "accelerator": "NVIDIA A100 80GB SXM",
+      "status": "modelled from published spec, not measured",
+      "peak_flops_per_s": 312000000000000.0,
+      "precision": "bf16 tensor core, dense",
+      "mfu_if_this_rate_were_sustained": 0.009923466480376182,
+      "ridge_point_flops_per_byte": 153.01618440411966,
+      "source": "NVIDIA A100 Tensor Core GPU datasheet, rev. 2021 (312 TFLOPS BFLOAT16 dense, 2039 GB/s)"
+    },
+    {
+      "accelerator": "NVIDIA H100 SXM5",
+      "status": "modelled from published spec, not measured",
+      "peak_flops_per_s": 989400000000000.0,
+      "precision": "bf16 tensor core, dense",
+      "mfu_if_this_rate_were_sustained": 0.0031292920374745995,
+      "ridge_point_flops_per_byte": 295.34328358208955,
+      "source": "NVIDIA H100 Tensor Core GPU datasheet, rev. 2023 (1979 TFLOPS BFLOAT16 with sparsity, i.e. 989.4 dense; 3.35 TB/s)"
+    },
+    {
+      "accelerator": "NVIDIA H200 SXM",
+      "status": "modelled from published spec, not measured",
+      "peak_flops_per_s": 989400000000000.0,
+      "precision": "bf16 tensor core, dense",
+      "mfu_if_this_rate_were_sustained": 0.0031292920374745995,
+      "ridge_point_flops_per_byte": 206.125,
+      "source": "NVIDIA H200 Tensor Core GPU datasheet, rev. 2024 (same SM peak as H100 SXM; 4.8 TB/s)"
+    }
+  ],
+  "meta": {
+    "platform": "macOS-10.16-x86_64-i386-64bit",
+    "torch": "2.2.2",
+    "threads": 10,
+    "model_config": {
+      "vocab_size": 50257,
+      "n_positions": 1024,
+      "n_layer": 12,
+      "n_head": 12,
+      "n_kv_head": null,
+      "n_embd": 768,
+      "dropout": 0.0,
+      "layer_norm_epsilon": 1e-05,
+      "norm_position": "pre",
+      "pos_embedding": "learned",
+      "tie_weights": true,
+      "activation": "gelu_tanh",
+      "residual_scaled_init": true,
+      "attn_bias": true,
+      "mlp_bias": true,
+      "use_sdpa": false
+    },
+    "statistic": "minimum over the timed steps"
+  }
+}

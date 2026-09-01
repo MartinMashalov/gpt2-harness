@@ -1,0 +1,252 @@
+{
+  "device": "cpu",
+  "batch": 2,
+  "seq": 256,
+  "active_steps": 1,
+  "total_self_us": 3194787.0,
+  "top_ops": [
+    {
+      "name": "aten::mm",
+      "self_us": 1648444.0,
+      "self_fraction": 0.5159793125488491,
+      "total_us": 1648444.0,
+      "count": 99,
+      "category": "matmul"
+    },
+    {
+      "name": "aten::addmm",
+      "self_us": 577288.0,
+      "self_fraction": 0.18069686648906486,
+      "total_us": 590275.0,
+      "count": 48,
+      "category": "matmul"
+    },
+    {
+      "name": "aten::bmm",
+      "self_us": 187041.0,
+      "self_fraction": 0.058545687083364245,
+      "total_us": 187043.0,
+      "count": 72,
+      "category": "matmul"
+    },
+    {
+      "name": "aten::mul",
+      "self_us": 122639.0,
+      "self_fraction": 0.03838722268495521,
+      "total_us": 125360.0,
+      "count": 132,
+      "category": "elementwise"
+    },
+    {
+      "name": "aten::copy_",
+      "self_us": 74204.0,
+      "self_fraction": 0.023226587562801528,
+      "total_us": 74204.0,
+      "count": 1016,
+      "category": "data movement"
+    },
+    {
+      "name": "aten::_softmax",
+      "self_us": 49728.0,
+      "self_fraction": 0.01556535693928891,
+      "total_us": 49728.0,
+      "count": 12,
+      "category": "softmax"
+    },
+    {
+      "name": "aten::tanh",
+      "self_us": 43924.0,
+      "self_fraction": 0.013748647405914699,
+      "total_us": 43924.0,
+      "count": 12,
+      "category": "elementwise"
+    },
+    {
+      "name": "ProfilerStep*",
+      "self_us": 34764.0,
+      "self_fraction": 0.010881476605482618,
+      "total_us": 3194787.0,
+      "count": 1,
+      "category": "other"
+    },
+    {
+      "name": "aten::add",
+      "self_us": 31798.0,
+      "self_fraction": 0.009953089204382013,
+      "total_us": 32152.0,
+      "count": 50,
+      "category": "elementwise"
+    },
+    {
+      "name": "aten::add_",
+      "self_us": 29598.0,
+      "self_fraction": 0.009264467396417977,
+      "total_us": 33022.0,
+      "count": 344,
+      "category": "elementwise"
+    },
+    {
+      "name": "aten::_log_softmax_backward_data",
+      "self_us": 27570.0,
+      "self_fraction": 0.00862968329344022,
+      "total_us": 27570.0,
+      "count": 1,
+      "category": "softmax"
+    },
+    {
+      "name": "aten::div",
+      "self_us": 26188.0,
+      "self_fraction": 0.008197103594073721,
+      "total_us": 28918.0,
+      "count": 172,
+      "category": "elementwise"
+    },
+    {
+      "name": "aten::_log_softmax",
+      "self_us": 25895.0,
+      "self_fraction": 0.00810539168964942,
+      "total_us": 25895.0,
+      "count": 1,
+      "category": "softmax"
+    },
+    {
+      "name": "aten::mul_",
+      "self_us": 23575.0,
+      "self_fraction": 0.007379208692160072,
+      "total_us": 26153.0,
+      "count": 296,
+      "category": "elementwise"
+    },
+    {
+      "name": "aten::native_layer_norm",
+      "self_us": 23013.0,
+      "self_fraction": 0.007203297121216532,
+      "total_us": 23408.0,
+      "count": 25,
+      "category": "normalization"
+    },
+    {
+      "name": "aten::addcdiv_",
+      "self_us": 20456.0,
+      "self_fraction": 0.006402930774414695,
+      "total_us": 20456.0,
+      "count": 148,
+      "category": "elementwise"
+    },
+    {
+      "name": "aten::lerp_",
+      "self_us": 20422.0,
+      "self_fraction": 0.006392288437382524,
+      "total_us": 20422.0,
+      "count": 148,
+      "category": "other"
+    },
+    {
+      "name": "aten::sum",
+      "self_us": 20077.0,
+      "self_fraction": 0.006284300017497254,
+      "total_us": 22519.0,
+      "count": 49,
+      "category": "reduction"
+    },
+    {
+      "name": "Optimizer.step#AdamW.step",
+      "self_us": 18891.0,
+      "self_fraction": 0.005913070261022097,
+      "total_us": 157370.0,
+      "count": 1,
+      "category": "optimizer"
+    },
+    {
+      "name": "aten::native_layer_norm_backward",
+      "self_us": 18027.0,
+      "self_fraction": 0.005642629696439857,
+      "total_us": 18427.0,
+      "count": 25,
+      "category": "normalization"
+    }
+  ],
+  "categories": [
+    {
+      "category": "matmul",
+      "self_us": 2427942.0,
+      "self_fraction": 0.7599699134871902
+    },
+    {
+      "category": "elementwise",
+      "self_us": 370543.0,
+      "self_fraction": 0.11598363208564452
+    },
+    {
+      "category": "softmax",
+      "self_us": 110379.0,
+      "self_fraction": 0.03454972115511926
+    },
+    {
+      "category": "data movement",
+      "self_us": 108101.0,
+      "self_fraction": 0.03383668457396377
+    },
+    {
+      "category": "other",
+      "self_us": 85149.0,
+      "self_fraction": 0.026652481057422607
+    },
+    {
+      "category": "normalization",
+      "self_us": 41214.0,
+      "self_fraction": 0.012900390542468089
+    },
+    {
+      "category": "reduction",
+      "self_us": 20077.0,
+      "self_fraction": 0.006284300017497254
+    },
+    {
+      "category": "optimizer",
+      "self_us": 19367.0,
+      "self_fraction": 0.006062062979472497
+    },
+    {
+      "category": "allocation",
+      "self_us": 10925.0,
+      "self_fraction": 0.0034196332963668625
+    },
+    {
+      "category": "embedding",
+      "self_us": 897.0,
+      "self_fraction": 0.0002807698917017003
+    },
+    {
+      "category": "loss",
+      "self_us": 193.0,
+      "self_fraction": 6.0410913153208646e-05
+    }
+  ],
+  "trace_path": "results/trace_training_step.json.gz",
+  "profiler_flops": 394279711488.0,
+  "meta": {
+    "platform": "macOS-10.16-x86_64-i386-64bit",
+    "torch": "2.2.2",
+    "threads": 10,
+    "model_config": {
+      "vocab_size": 50257,
+      "n_positions": 1024,
+      "n_layer": 12,
+      "n_head": 12,
+      "n_kv_head": null,
+      "n_embd": 768,
+      "dropout": 0.0,
+      "layer_norm_epsilon": 1e-05,
+      "norm_position": "pre",
+      "pos_embedding": "learned",
+      "tie_weights": true,
+      "activation": "gelu_tanh",
+      "residual_scaled_init": true,
+      "attn_bias": true,
+      "mlp_bias": true,
+      "use_sdpa": false
+    },
+    "note": "self time partitions the step; total time double counts parents"
+  }
+}
