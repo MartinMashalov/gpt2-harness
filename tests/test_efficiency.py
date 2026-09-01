@@ -83,12 +83,25 @@ def test_zero_row_survives_quantization() -> None:
     assert torch.isfinite(out).all()
 
 
-def test_int4_packing_round_trips() -> None:
-    q = torch.randint(-8, 8, (7, 6), dtype=torch.int8)
+@pytest.mark.parametrize("shape", [(7, 6), (5, 5), (1,), (3,)])
+def test_int4_packing_round_trips(shape: tuple[int, ...]) -> None:
+    """Two codes per byte, recovered exactly -- including odd element counts.
+
+    The odd cases matter: they are the only ones that hit the padding branch,
+    where a wrongly-placed pad tensor would raise or corrupt the last value.
+    """
+    torch.manual_seed(0)
+    q = torch.randint(-8, 8, shape, dtype=torch.int8)
     packed = pack_int4(q)
     assert packed.numel() == math.ceil(q.numel() / 2)
     assert packed.dtype == torch.uint8
     assert torch.equal(unpack_int4(packed, q.numel()).view_as(q), q)
+
+
+def test_int4_packing_covers_the_full_code_range() -> None:
+    """Every representable 4-bit code must survive the +8 bias and the nibbles."""
+    q = torch.arange(-8, 8, dtype=torch.int8)
+    assert torch.equal(unpack_int4(pack_int4(q), q.numel()), q)
 
 
 def test_quantize_model_shrinks_the_checkpoint() -> None:
@@ -104,12 +117,18 @@ def test_quantize_model_shrinks_the_checkpoint() -> None:
 def test_quantized_model_still_produces_finite_logits() -> None:
     cfg = GPTConfig(vocab_size=97, n_positions=32, n_layer=2, n_head=4, n_embd=64)
     model = GPT(cfg).eval()
-    qm, _ = quantize_model(model, 8)
     x = torch.randint(0, cfg.vocab_size, (2, 9))
+
+    # Snapshot BEFORE quantizing: the source model must come back untouched,
+    # and that can only be checked against a copy taken beforehand.
+    original = model.h[0].mlp.c_fc.weight.detach().clone()
+    qm, _ = quantize_model(model, 8)
+
     with torch.no_grad():
         assert torch.isfinite(qm(x)["logits"]).all()
-    # The original must be untouched -- quantize_model copies.
-    assert not torch.equal(qm.h[0].mlp.c_fc.weight, model.h[0].mlp.c_fc.weight) or True
+
+    assert torch.equal(model.h[0].mlp.c_fc.weight, original), "quantize_model mutated its input"
+    assert not torch.equal(qm.h[0].mlp.c_fc.weight, original), "weights were not quantized"
     assert model.h[0].mlp.c_fc.weight.dtype == torch.float32
 
 
@@ -200,14 +219,30 @@ def test_model_size_counts_tied_weights_once() -> None:
 
 
 def test_distillation_loss_reduces_to_cross_entropy_at_alpha_zero() -> None:
+    """At alpha=0 the objective must be plain cross-entropy.
+
+    Compared against an independently computed cross-entropy, not against the
+    function's own second return value -- at alpha=0 the implementation returns
+    the same object twice, so `total is ce` and asserting they are equal would
+    hold no matter what either one contained.
+    """
+    import torch.nn.functional as F
+
     from transformer_internals.distill import distillation_loss
 
     s = torch.randn(2, 3, 11)
     t = torch.randn(2, 3, 11)
     y = torch.randint(0, 11, (2, 3))
+    expected = F.cross_entropy(s.reshape(-1, 11), y.reshape(-1))
+
     total, ce, kl = distillation_loss(s, t, y, alpha=0.0)
-    assert torch.equal(total, ce)
+    assert torch.allclose(total, expected, atol=1e-6)
+    assert torch.allclose(ce, expected, atol=1e-6)
     assert float(kl) == 0.0
+
+    # The teacher must be genuinely ignored at alpha=0.
+    other, _, _ = distillation_loss(s, torch.randn(2, 3, 11), y, alpha=0.0)
+    assert torch.allclose(total, other, atol=1e-6)
 
 
 def test_distillation_kl_is_zero_when_student_equals_teacher() -> None:

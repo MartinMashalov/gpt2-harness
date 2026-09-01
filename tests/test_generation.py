@@ -138,4 +138,6 @@ def test_eos_stops_generation() -> None:
         model.wte.weight[3] = 1.0
     out = generate(model, torch.zeros(1, 2, dtype=torch.long), 20,
                    do_sample=False, eos_token_id=3)
-    assert out.shape[1] < 22
+    assert out.shape[1] < 22, "generation did not stop early"
+    # It must have stopped *because of EOS*, not for some other reason.
+    assert out[0, -1].item() == 3

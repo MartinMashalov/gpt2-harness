@@ -204,8 +204,13 @@ Two honest negatives:
   distinct population of copying heads — **L11H3 (0.639), L11H10 (0.605), L7H8
   (0.552)**, with 17% of all heads above 0.1 against a median of 0.001. But all
   five prefix-matching heads score essentially zero on it (L5H5: 0.008, L7H2:
-  0.000). Folding in the LayerNorm gains does not change this (tested). The
-  construction only sees the *direct* path to the unembedding, whereas an
+  0.000). Folding the LayerNorm gains into the circuit does not rescue the
+  induction heads — they stay at **0.005 or below** — though it does move
+  individual heads by up to 0.426 and shifts the ranking (rank correlation
+  0.879), so it is a real refinement rather than a no-op. Both versions are
+  computed and committed (`copying`, `copying_ln_folded` in
+  [`results/induction.json`](results/induction.json)). The construction only sees
+  the *direct* path to the unembedding, whereas an
   induction head writes into a residual stream that later layers read and
   transform — so "attends to the right place" and "copies via its own direct
   path" turn out to be nearly disjoint properties in GPT-2 small. The one head
@@ -238,7 +243,9 @@ Two honest negatives:
 | 768 | 131.09 | 34.67 | **3.78×** |
 
 The cached arm is **flat** — ~32 ms per token regardless of context, the signature
-of O(1) per-token work — while the uncached arm grows linearly per token and
+of O(1) per-token work, though only 3 repeats were taken and the run-to-run spread
+reaches 40% of the median at the longest prompt — while the uncached arm grows
+linearly per token and
 therefore quadratically in total. **The crossover is around 256–512 tokens**: below
 that the cache buys nothing on this hardware, because the per-step overhead of
 concatenating and writing cache tensors is the same order as the work it saves.
@@ -287,21 +294,33 @@ per byte. Source: [`results/quantization.json`](results/quantization.json).*
 > made *within* a section, and the frontier re-scores every configuration itself
 > for exactly this reason.
 
-| Scheme | Perplexity | Δ ppl | On disk | Compression |
+| Scheme | Perplexity | Paired Δ loss (nats, ±2 s.e.) | On disk | Compression |
 |---|---|---|---|---|
-| fp32 reference | 18.27 ± 2.35 | — | 497.8 MB | 1.00× |
-| int8 per-channel | 18.31 ± 2.34 | **+0.03** | 243.4 MB | 2.05× |
-| int8 per-tensor | 20.44 ± 2.60 | +2.17 | 243.0 MB | 2.05× |
-| int4 per-channel | 24.01 ± 3.14 | +5.74 | 200.9 MB | 2.48× |
-| int4 per-tensor | **2291.84 ± 212.24** | +2273.56 | 200.6 MB | 2.48× |
-| int8 per-channel + embedding | 19.68 ± 2.46 | +1.41 | 127.8 MB | **3.90×** |
+| fp32 reference | 18.27 | — | 497.8 MB | 1.00× |
+| int8 per-channel | 18.31 | **+0.0019 ± 0.0008** | 243.4 MB | 2.05× |
+| int8 per-tensor | 20.44 | +0.1122 ± 0.0088 | 243.0 MB | 2.05× |
+| int4 per-channel | 24.01 | +0.2732 ± 0.0167 | 200.9 MB | 2.48× |
+| int4 per-tensor | **2291.84** | +4.8317 ± 0.0748 | 200.6 MB | 2.48× |
+| int8 per-channel + embedding | 19.68 | +0.0741 ± 0.0051 | 127.8 MB | **3.90×** |
 
-**int8 with per-channel scales is essentially free** (+0.03 perplexity, well
-inside the ±2.35 spread of the estimate itself). The same bit width with a single
-per-tensor scale costs +2.17. At 4 bits the difference is no longer a tradeoff but
-a cliff: per-channel degrades gracefully to 24.0, **per-tensor collapses to
-2291.8** — one outlier weight sets the step size for the entire matrix and
-everything else quantizes to near-zero.
+The Δ column is the **paired** per-chunk loss change: every scheme is scored on
+the same 8 chunks, so the chunk-to-chunk variation is common to both arms and
+cancels. That matters — the unpaired spread of perplexity across chunks is ±2.35,
+which is larger than four of these five effects and would have hidden all of them.
+
+With 8 paired chunks the test resolves shifts of ~0.001 nats, so *every* scheme
+here is statistically distinguishable from fp32, **int8 per-channel included**.
+Statistical and practical significance are different questions: int8 per-channel
+costs +0.0019 nats, which is +0.03 perplexity on a baseline of 18.27 — detectable,
+and negligible. The table reports both numbers so a reader can apply their own
+threshold; the highlighted row uses a stated one (0.01 nats, ≈1% perplexity).
+
+**Per-channel scaling is what makes the bit width usable.** At 8 bits, moving from
+per-channel to a single per-tensor scale costs **59× more** (+0.1122 vs +0.0019
+nats). At 4 bits it stops being a tradeoff and becomes a cliff: per-channel
+degrades gracefully to perplexity 24.0, **per-tensor collapses to 2291.8** — one
+outlier weight sets the step size for the entire matrix and everything else
+quantizes to near-zero.
 
 Note the compression ratios: int8 only reaches 2.05×, not 4×, because the 38.6M-parameter
 embedding stays in fp32. Quantizing it too reaches 3.90× for +1.41
@@ -340,7 +359,10 @@ have redundant heads to spare.
 
 **Tying this back to the induction result.** Pruning heads destroys induction
 behaviour quickly: second-copy loss on the repeated-sequence probe rises from
-0.378 (unpruned) to **3.69 at 10% head sparsity** and 17.80 at 70%. And the
+0.378 (unpruned) to **3.69 at 10% head sparsity** and 17.80 at 70%. (This probe
+uses 4 sequences; the 0.365 quoted earlier uses 8, which is why the two unpruned
+baselines differ slightly — they are the same measurement at different batch
+sizes.) And the
 gradient criterion, which ranks heads by their contribution to *language-modelling*
 loss, correlates only **+0.11 (Spearman)** with direct-ablation damage to
 *induction*. Those are two different notions of importance, and a pruning
@@ -371,7 +393,9 @@ of 0.0311 — inside the noise, so *indistinguishable*. Raising α makes
 it monotonically worse: at α=0.9, where the soft targets dominate the hard
 labels, the student is 1.05 nats behind. And it costs **2.6× the
 wall-clock**, because every step runs a 124M-parameter teacher forward to train a
-5.8M-parameter student.
+16.1M-parameter student. (The student is larger than the ablation models because
+it must share the teacher's full 50257-token vocabulary — 12.9M of its parameters
+are the embedding alone.)
 
 This is a negative result at a small budget, not a refutation of distillation.
 150 steps is far too few for a student to exploit the teacher's distribution,
@@ -464,9 +488,11 @@ Stated plainly, because the point of the repository is calibration.
   real; no speedup is claimed.
 - **Pruning is masked, not physically removed.** Parameter counts are what a real
   implementation would delete; the FLOPs are not actually saved in this code.
-- **The copying score is a direct-path construction** and does not fold in
-  LayerNorm gains; it is reported as an uninformative measurement rather than
-  quietly dropped.
+- **The copying score is a direct-path construction.** It is computed both with
+  and without the LayerNorm gains folded in, but neither version models
+  LayerNorm's centring or its per-token rescaling, and neither sees the indirect
+  paths through later layers. It is reported as a measurement that fails to
+  identify induction heads rather than quietly dropped.
 - **Latency numbers are Apple MPS**, one machine, median of 3. The *shape* of the
   curves is the robust finding; the absolute milliseconds are not portable.
 - **Only GPT-2 124M is verified.** The loader is written for the general shape and
@@ -541,14 +567,14 @@ src/transformer_internals/
 scripts/           one runner per experiment + make_figures + make_pareto
 results/           committed JSON — every number in this README comes from here
 assets/            committed figures, each with a *_web.png variant
-tests/             75 tests; the weight-dependent ones are marked `weights`
+tests/             79 tests; the weight-dependent ones are marked `weights`
 ```
 
 ## Tests
 
 ```
-pytest -q                    # 75 passed
-pytest -q -m "not weights"   # 66 passed — what CI runs, offline, CPU-only
+pytest -q                    # 79 passed
+pytest -q -m "not weights"   # 70 passed — what CI runs, offline, CPU-only
 ```
 
 The suite includes: BPE round-trip *and* exact agreement with the reference
@@ -558,8 +584,10 @@ the fused-SDPA arm against the reference path; cached vs uncached generation
 token-identical; future tokens provably unable to change earlier logits;
 `ln(vocab_size)` loss at init; weight tying sharing storage; the residual-init
 scale factor; the lr schedule shape; bit-reproducible training under a fixed
-seed; the quantization error bound (`≤ scale/2`), int4 pack round-trip, and
-per-channel beating per-tensor on an outlier row; pruning parameter accounting;
+seed; the quantization error bound (`≤ scale/2`), int4 pack round-trip over the full
+code range and at odd element counts, and per-channel beating per-tensor on an
+outlier row; that `quantize_model` does not mutate its input; pruning parameter
+accounting;
 the KV cache formula against allocated tensors; and the Part 2 equivalence tests
 with a negative control that must fail on a deliberately broken model.
 

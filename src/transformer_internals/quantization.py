@@ -143,7 +143,8 @@ def pack_int4(q: torch.Tensor) -> torch.Tensor:
     """
     flat = q.flatten().to(torch.int16) + 8
     if flat.numel() % 2:
-        flat = torch.cat([flat, torch.zeros(1, dtype=torch.int16)])
+        # Same device as the codes: a CPU-pinned pad would raise on any other device.
+        flat = torch.cat([flat, torch.zeros(1, dtype=torch.int16, device=flat.device)])
     low, high = flat[0::2], flat[1::2]
     return ((high << 4) | low).to(torch.uint8)
 

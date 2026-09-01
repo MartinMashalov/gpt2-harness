@@ -8,6 +8,8 @@ perplexity with error bars and measured on-disk size. Writes
 from __future__ import annotations
 
 import argparse
+import math
+import statistics
 import sys
 from pathlib import Path
 
@@ -20,6 +22,11 @@ from transformer_internals.quantization import (
     perplexity_with_error_bars,
     quantize_model,
 )
+
+#: Practical-significance threshold in nats: below this a quality change is
+#: reported as negligible regardless of whether the paired test resolves it.
+#: 0.01 nats is ~1% in perplexity.
+PRACTICAL_NATS = 0.01
 
 SCHEMES = [
     ("int8 per-channel", 8, "per_channel", False),
@@ -73,37 +80,72 @@ def main() -> int:
             qm, dataset, n_chunks=args.chunks,
             batches_per_chunk=args.batches_per_chunk, batch_size=args.batch_size, device=device,
         )
+        # Paired per-chunk deltas. Every scheme is scored on the SAME chunks, so
+        # the chunk-to-chunk variation is common to both arms and cancels; the
+        # unpaired spread of either arm alone is not the uncertainty of the
+        # difference and using it as one both understates real effects and
+        # excuses fake ones.
+        paired = [q - b for q, b in zip(quality["chunk_losses"], base_quality["chunk_losses"], strict=True)]
+        mean_d = statistics.fmean(paired)
+        sd_d = statistics.stdev(paired) if len(paired) > 1 else 0.0
+        stderr_d = sd_d / math.sqrt(len(paired)) if paired else 0.0
+        quality["paired_loss_delta"] = {
+            "mean": mean_d,
+            "sd": sd_d,
+            "stderr": stderr_d,
+            "n_chunks": len(paired),
+            "per_chunk": paired,
+            # Distinguishable when the mean shift exceeds twice its own standard
+            # error -- a yardstick applied identically to every scheme.
+            "distinguishable": bool(abs(mean_d) > 2 * stderr_d) if stderr_d else False,
+        }
         res = QuantResult(label, bits, gran, inc_emb, stats, quality, speed_of(qm))
         rows.append(res.to_dict())
-        print(f"  ppl {quality['ppl_of_mean_loss']:.4f} ± {quality['ppl_std']:.4f}  "
+        pd = quality["paired_loss_delta"]
+        print(f"  ppl {quality['ppl_of_mean_loss']:.4f}  "
+              f"| paired Δloss {pd['mean']:+.4f} ± {pd['stderr']:.4f} (2se) "
+              f"{'DISTINGUISHABLE' if pd['distinguishable'] else 'n.s.'} "
               f"| {stats['packed_bytes'] / 1e6:.1f} MB "
               f"| {stats['compression_ratio']:.2f}x smaller")
         del qm
 
-    # Highlight the best scheme that stays within one baseline sd of fp32.
-    tol = base_quality["ppl_std"]
-    ok = [r for r in rows
-          if r["quality"]["ppl_of_mean_loss"] - base_quality["ppl_of_mean_loss"] <= tol]
+    # Statistical and practical significance are different questions, and the
+    # paired test answers only the first. With 8 paired chunks it resolves shifts
+    # of ~0.001 nats, so EVERY scheme here is "distinguishable" from fp32 --
+    # including int8 per-channel at +0.002 nats, which is a 0.03 perplexity move
+    # on a baseline of 18.27. Reporting that as a quality cost would be true and
+    # useless. So the highlight uses a stated practical threshold instead, and
+    # the table prints both numbers so a reader can apply their own.
+    practical = PRACTICAL_NATS
+    ok = [r for r in rows if abs(r["quality"]["paired_loss_delta"]["mean"]) < practical]
     if ok:
         best = max(ok, key=lambda r: r["compression_ratio"])
         for r in rows:
             r["highlight"] = r["label"] == best["label"]
 
-    print(f"\n{'scheme':<30} {'ppl':>16} {'Δ ppl':>8} {'MB':>8} {'ratio':>7}")
-    print("-" * 74)
-    print(f"{'fp32 (reference)':<30} {base_quality['ppl_of_mean_loss']:>8.4f} "
-          f"± {base_quality['ppl_std']:<5.4f} {'--':>8} {fp32_bytes / 1e6:>8.1f} {'1.00':>7}")
+    print(f"\n{'scheme':<30} {'ppl':>9} {'paired Δloss (±2se)':>24} {'MB':>8} {'ratio':>7}")
+    print("-" * 82)
+    print(f"{'fp32 (reference)':<30} {base_quality['ppl_of_mean_loss']:>9.4f} "
+          f"{'--':>24} {fp32_bytes / 1e6:>8.1f} {'1.00':>7}")
     for r in rows:
-        d = r["quality"]["ppl_of_mean_loss"] - base_quality["ppl_of_mean_loss"]
-        print(f"{r['label']:<30} {r['quality']['ppl_of_mean_loss']:>8.4f} "
-              f"± {r['quality']['ppl_std']:<5.4f} {d:>+8.3f} "
-              f"{r['packed_bytes'] / 1e6:>8.1f} {r['compression_ratio']:>6.2f}x")
+        pd = r["quality"]["paired_loss_delta"]
+        verdict = "" if pd["distinguishable"] else "  n.s."
+        cell = f"{pd['mean']:+.4f} ± {2 * pd['stderr']:.4f}{verdict}"
+        print(f"{r['label']:<30} {r['quality']['ppl_of_mean_loss']:>9.4f} "
+              f"{cell:>24} {r['packed_bytes'] / 1e6:>8.1f} {r['compression_ratio']:>6.2f}x")
 
     write_json(args.out, {
         "baseline": {**base_quality, "bytes": fp32_bytes, "speed": base_speed},
         "rows": rows,
         "meta": {
             "device": str(device),
+            "practical_threshold_nats": PRACTICAL_NATS,
+            "significance_note": (
+                "paired per-chunk delta vs fp32 on identical chunks; 'distinguishable' "
+                "means |mean| > 2 standard errors. With 8 chunks this resolves ~0.001 "
+                "nats, so every scheme is statistically distinguishable -- the "
+                "highlight therefore uses the practical threshold above instead."
+            ),
             "n_chunks": args.chunks,
             "batch_size": args.batch_size,
             "speed_measured": args.speed,

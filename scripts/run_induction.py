@@ -54,6 +54,17 @@ def main() -> int:
             f"{r['name']:<8} {r['prefix_matching']:>8.3f} {r['previous_token']:>9.3f} "
             f"{r['copying']:>8.3f} {abl:>11}"
         )
+    if scores.copying_ln_folded is not None:
+        plain, folded = scores.copying, scores.copying_ln_folded
+        ind = [(h["layer"], h["head"]) for h in scores.top_heads(5)]
+        print(
+            f"\ncopying score, LayerNorm gains folded in: max over all heads "
+            f"{folded.max():.4f}, max among the 5 top prefix-matching heads "
+            f"{max(folded[layer, head] for layer, head in ind):.4f} "
+            f"(unfolded {max(plain[layer, head] for layer, head in ind):.4f}); "
+            f"largest per-head shift {(folded - plain).abs().max():.4f}"
+        )
+
     print("\ntop previous-token heads (the other half of the circuit):")
     for r in scores.top_heads(4, key="previous_token"):
         print(f"  {r['name']:<8} prev-token {r['previous_token']:.3f}")

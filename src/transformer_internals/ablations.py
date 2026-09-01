@@ -127,7 +127,7 @@ def build_arms() -> list[Arm]:
             label="untied embeddings",
             group="tie_weights",
             overrides={"tie_weights": False},
-            note="separate input embedding and output head (+12.9M parameters here)",
+            note="separate input embedding and output head (+1.05M parameters at this vocab size)",
         ),
         Arm(
             key="sinusoidal",

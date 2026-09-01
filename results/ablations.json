@@ -56,7 +56,7 @@
       "arm": "untied",
       "label": "untied embeddings",
       "group": "tie_weights",
-      "note": "separate input embedding and output head (+12.9M parameters here)",
+      "note": "separate input embedding and output head (+1.05M parameters at this vocab size)",
       "n_seeds": 3,
       "n_params": 6868992,
       "val_loss_mean": 3.9439452489217124,
@@ -2670,7 +2670,7 @@
           "arm": "untied",
           "label": "untied embeddings",
           "group": "tie_weights",
-          "note": "separate input embedding and output head (+12.9M parameters here)",
+          "note": "separate input embedding and output head (+1.05M parameters at this vocab size)",
           "seed": 0
         }
       },
@@ -3013,7 +3013,7 @@
           "arm": "untied",
           "label": "untied embeddings",
           "group": "tie_weights",
-          "note": "separate input embedding and output head (+12.9M parameters here)",
+          "note": "separate input embedding and output head (+1.05M parameters at this vocab size)",
           "seed": 1
         }
       },
@@ -3356,7 +3356,7 @@
           "arm": "untied",
           "label": "untied embeddings",
           "group": "tie_weights",
-          "note": "separate input embedding and output head (+12.9M parameters here)",
+          "note": "separate input embedding and output head (+1.05M parameters at this vocab size)",
           "seed": 2
         }
       }

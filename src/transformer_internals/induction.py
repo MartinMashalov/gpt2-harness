@@ -79,6 +79,9 @@ class InductionScores:
         prefix_matching: Attention mass on the induction target position.
         previous_token: Attention mass on position ``i - 1``.
         copying: Fraction of sampled tokens the head's OV circuit maps to itself.
+        copying_ln_folded: The same score with the LayerNorm gains folded in --
+            computed so that the negative result can be shown not to be an
+            artefact of leaving them out.
         ablation: Increase in second-copy loss (nats) when the head is zeroed.
             The causal measure: it says the head is *used*, not merely present.
         chance_level: Attention a uniform head would place on a single position,
@@ -90,7 +93,8 @@ class InductionScores:
     prefix_matching: torch.Tensor
     previous_token: torch.Tensor
     copying: torch.Tensor
-    chance_level: float
+    copying_ln_folded: torch.Tensor | None = None
+    chance_level: float = 0.0
     ablation: torch.Tensor | None = None
     baseline_second_copy_loss: float = float("nan")
     meta: dict[str, Any] = field(default_factory=dict)
@@ -130,6 +134,9 @@ class InductionScores:
             "prefix_matching": self.prefix_matching.tolist(),
             "previous_token": self.previous_token.tolist(),
             "copying": self.copying.tolist(),
+            "copying_ln_folded": (
+                self.copying_ln_folded.tolist() if self.copying_ln_folded is not None else None
+            ),
             "chance_level": self.chance_level,
             "ablation": self.ablation.tolist() if self.ablation is not None else None,
             "baseline_second_copy_loss": self.baseline_second_copy_loss,
@@ -250,6 +257,7 @@ def copying_scores(
     seed: int = 0,
     top_k: int = 1,
     device: str | torch.device = "cpu",
+    fold_ln: bool = False,
 ) -> torch.Tensor:
     """Score every head's OV circuit on whether it copies token identity.
 
@@ -265,6 +273,13 @@ def copying_scores(
         seed: RNG seed for the token sample.
         top_k: Count a token as copied if its own logit is in the top ``k``.
         device: Device.
+        fold_ln: Fold the LayerNorm gains into the circuit -- the block's
+            ``ln_1`` gain into the embedding it reads, and ``ln_f``'s gain into
+            the unembedding it writes through. This is the standard refinement,
+            and the point of computing it is to check that the conclusion does
+            not depend on omitting it. The centring and per-token scaling of
+            LayerNorm are still not modelled; only the learned gains are, which
+            is what "folding" conventionally means here.
 
     Returns:
         ``(n_layer, n_head)`` fraction of tokens copied.
@@ -274,6 +289,8 @@ def copying_scores(
     tokens = torch.randint(0, cfg.vocab_size, (n_tokens,), generator=gen)
     W_E = model.wte.weight.detach()[tokens.to(model.wte.weight.device)].to(device)  # (N, C)
     W_U = model.wte.weight.detach().to(device).t()  # (C, vocab) -- tied
+    if fold_ln:
+        W_U = W_U * model.ln_f.weight.detach().to(device).unsqueeze(1)
 
     scores = torch.zeros(cfg.n_layer, cfg.n_head)
     hd = cfg.head_dim
@@ -288,9 +305,12 @@ def copying_scores(
             else torch.zeros(cfg.n_embd, device=device)
         )
         W_o_all = attn.c_proj.weight.detach().to(device)  # (C_out, C_in)
+        # The head reads the stream after this block's ln_1, so its gain belongs
+        # on the embedding side of the circuit.
+        E = W_E * block.ln_1.weight.detach().to(device) if fold_ln else W_E
         for head in range(cfg.n_head):
             sl = slice(head * hd, (head + 1) * hd)
-            v = W_E @ W_v_all[sl, :].t() + b_v_all[sl]  # (N, hd)
+            v = E @ W_v_all[sl, :].t() + b_v_all[sl]  # (N, hd)
             resid = v @ W_o_all[:, sl].t()  # (N, C)
             logits = resid @ W_U  # (N, vocab)
             if top_k == 1:
@@ -477,6 +497,9 @@ def score_heads(
         model, seq_len=seq_len, batch_size=batch_size, seed=seed, device=device
     )
     copying = copying_scores(model, n_tokens=n_copy_tokens, seed=seed, device=device)
+    copying_folded = copying_scores(
+        model, n_tokens=n_copy_tokens, seed=seed, device=device, fold_ln=True
+    )
     ablation: torch.Tensor | None = None
     baseline = float("nan")
     if with_ablation:
@@ -487,6 +510,7 @@ def score_heads(
         prefix_matching=prefix,
         previous_token=prev,
         copying=copying,
+        copying_ln_folded=copying_folded,
         chance_level=chance,
         ablation=ablation,
         baseline_second_copy_loss=baseline,

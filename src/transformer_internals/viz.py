@@ -446,23 +446,23 @@ def fig_quantization(quant: dict[str, Any], path: str | Path, web: bool = False)
             colors.append("#4A4F58")
         else:
             colors.append("#B9BEC6")
+    # No error bars on the bars: the per-chunk spread of perplexity is not the
+    # uncertainty of the difference between two schemes scored on the SAME
+    # chunks. The paired delta below carries that, in nats.
     ax.bar(x, [r["quality"]["ppl_of_mean_loss"] for r in rows], color=colors,
            width=0.6, linewidth=0, zorder=3)
-    ax.errorbar(x, [r["quality"]["ppl_of_mean_loss"] for r in rows],
-                yerr=[r["quality"]["ppl_std"] for r in rows], fmt="none",
-                ecolor=MUTED, elinewidth=1.0, capsize=3, zorder=4)
 
     ax.axhline(base_ppl, color=ACCENT if not any(r.get("highlight") for r in rows) else MUTED,
                linewidth=1.2, linestyle=(0, (4, 3)), zorder=2)
-    ax.annotate(f"fp32 baseline  ppl {base_ppl:.2f}", xy=(-0.42, base_ppl),
-                xytext=(0, -13), textcoords="offset points", ha="left",
-                fontsize=7.5, color=MUTED)
+    # The baseline line is labelled in the subtitle, not inline: on a log axis
+    # every bar sits close to it, so there is no clear space for a label here.
 
     for xi, r in zip(x, rows, strict=True):
         ppl = r["quality"]["ppl_of_mean_loss"]
-        delta = ppl - base_ppl
+        pd = r["quality"].get("paired_loss_delta")
+        delta_txt = f"{pd['mean']:+.4f} nats" if pd else f"{ppl - base_ppl:+,.1f} ppl"
         ax.annotate(
-            f"{ppl:,.1f}\n{delta:+,.1f} ppl\n{r['compression_ratio']:.2f}× smaller",
+            f"{ppl:,.1f}\n{delta_txt}\n{r['compression_ratio']:.2f}× smaller",
             xy=(xi, ppl), xytext=(0, 7), textcoords="offset points", ha="center",
             fontsize=7.2, linespacing=1.4, color=INK,
             fontweight="bold" if r.get("highlight") else "normal",
@@ -471,13 +471,14 @@ def fig_quantization(quant: dict[str, Any], path: str | Path, web: bool = False)
     ax.set_yscale("log")
     ax.set_xticks(x)
     ax.set_xticklabels(labels, fontsize=7.5)
-    ax.set_ylabel("held-out perplexity, log scale  (± sd over chunks)")
+    ax.set_ylabel("held-out perplexity, log scale")
     _hgrid(ax)
     ax.set_ylim(base_ppl * 0.6, max(r["quality"]["ppl_of_mean_loss"] for r in rows) * 40)
     ax.set_title("Per-channel scales are what make low-bit quantization work",
                  loc="left", pad=14)
     ax.annotate(
-        "one scale per output channel (dark) vs one scale for the whole tensor (light)",
+        f"dashed line = fp32 baseline, ppl {base_ppl:.2f} · dark = one scale per "
+        f"output channel, light = one scale per tensor · Δ is the paired loss change",
         xy=(0, 1.02), xycoords="axes fraction", fontsize=7.5, color=MUTED,
     )
     return save(fig, path)

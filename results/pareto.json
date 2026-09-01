@@ -139,6 +139,6 @@
     "eval_batches": 12,
     "fp32_bytes": 497759232,
     "n_params": 124439808,
-    "caption": "every point scored by one function on the same 6,144 held-out tokens \u00b7 sizes are packed bytes on disk"
+    "caption": "every point scored by one function on the same 6,144 held-out tokens \u00b7 quantized sizes are measured packed files, baseline and pruned sizes are parameter counts x 4 bytes"
   }
 }

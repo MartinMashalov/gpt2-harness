@@ -149,7 +149,8 @@ def main() -> int:
             "n_params": total_params,
             "caption": (
                 f"every point scored by one function on the same {n_tokens:,} held-out "
-                f"tokens · sizes are packed bytes on disk"
+                f"tokens · quantized sizes are measured packed files, baseline and "
+                f"pruned sizes are parameter counts x 4 bytes"
             ),
         },
     })
