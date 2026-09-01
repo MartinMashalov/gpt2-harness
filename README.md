@@ -670,7 +670,7 @@ Both would have passed a loss-curve-and-samples demonstration.
 
 ---
 
-## Part 7. using it as an instrument
+## Part 7. Using it as an instrument
 
 ### What each design decision is worth
 
@@ -767,7 +767,7 @@ Two honest negatives:
 
 ---
 
-## Part 8. inference efficiency
+## Part 8. Inference efficiency
 
 ### The KV cache, measured rather than asserted
 
