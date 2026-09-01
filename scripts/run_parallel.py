@@ -34,6 +34,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _common import ASSETS, RESULTS, write_json
 from transformer_internals import hardware, viz
+from transformer_internals.hardware import HardwareError
 from transformer_internals.parallel.common import parallel_config
 from transformer_internals.parallel.comms import spawn_workers
 from transformer_internals.parallel.data_parallel import ddp_equivalence_worker
@@ -101,6 +102,20 @@ def main() -> int:
     ap.add_argument("--out", default=str(RESULTS / "parallel_comms.json"))
     ap.add_argument("--assets", default=str(ASSETS))
     ap.add_argument("--no-figure", action="store_true")
+    ap.add_argument(
+        "--backend",
+        default="auto",
+        help=(
+            "nccl, gloo or auto. Forcing gloo on a CUDA box is useful: the "
+            "equivalence proofs are backend-independent by construction, and "
+            "running both on one machine is what turns that into an observation."
+        ),
+    )
+    ap.add_argument(
+        "--allow-oversubscribe",
+        action="store_true",
+        help="permit more ranks than GPUs; the proofs survive it, the timings do not",
+    )
     args = ap.parse_args()
 
     p = args.world_size
@@ -108,8 +123,25 @@ def main() -> int:
     n_embd, seq, batch = cfg.n_embd, args.seq, args.batch
     started = time.time()
     caps = hardware.Capabilities.detect()
+    backend_request = None if args.backend == "auto" else args.backend
+    # Resolved once, in the parent, so an impossible request is one sentence
+    # here rather than a traceback from every rank.
+    backend = hardware.select_backend(caps, backend_request)
+
+    def spawn(fn, world_size, kwargs=None, **extra):
+        """Every spawn in this script goes through the same backend and caps."""
+        return spawn_workers(
+            fn,
+            world_size,
+            kwargs or {},
+            backend=backend_request,
+            caps=caps,
+            allow_oversubscribe=args.allow_oversubscribe,
+            **extra,
+        )
+
     print(
-        f"{hardware.select_backend(caps)} on {caps.accelerator} | equivalence world "
+        f"{backend} on {caps.accelerator} | equivalence world "
         f"size {p} | pipeline stages {args.pipeline_stages} | torch {torch.__version__}"
     )
 
@@ -119,7 +151,7 @@ def main() -> int:
 
     # ---------------------------------------------------------------- DDP
     print("\n[1/6] data parallel")
-    ddp = spawn_workers(
+    ddp = spawn(
         ddp_equivalence_worker,
         p,
         {"batch": batch, "seq": seq, "steps": args.steps},
@@ -154,7 +186,7 @@ def main() -> int:
     print("[2/6] sharded data parallel (ZeRO)")
     memory: dict[str, Any] = {}
     for stage in (1, 2):
-        res = spawn_workers(
+        res = spawn(
             zero_equivalence_worker, p, {"stage": stage, "steps": args.steps}
         )
         v = res[0].value
@@ -204,7 +236,7 @@ def main() -> int:
         )
     )
 
-    z3 = spawn_workers(zero3_equivalence_worker, p, {"steps": args.steps})
+    z3 = spawn(zero3_equivalence_worker, p, {"steps": args.steps})
     v3 = z3[0].value
     equivalence["zero_3"] = {
         "what_is_compared": (
@@ -256,7 +288,7 @@ def main() -> int:
 
     # ---------------------------------------------------------- tensor par
     print("[3/6] tensor parallel")
-    tp = spawn_workers(tp_equivalence_worker, p, {"batch": 4, "seq": 12})
+    tp = spawn(tp_equivalence_worker, p, {"batch": 4, "seq": 12})
     tv = tp[0].value
     equivalence["tensor_parallel"] = {
         "what_is_compared": (
@@ -303,7 +335,7 @@ def main() -> int:
     pipe_stages = args.pipeline_stages
     pipeline: dict[str, Any] = {}
     for kind in ("gpipe", "1f1b"):
-        res = spawn_workers(
+        res = spawn(
             pipeline_worker,
             pipe_stages,
             {"kind": kind, "micro_batches": 4, "batch": batch, "seq": seq},
@@ -344,7 +376,7 @@ def main() -> int:
     )
 
     print("      bubble scan")
-    scan = spawn_workers(
+    scan = spawn(
         bubble_scan_worker,
         pipe_stages,
         {
@@ -453,7 +485,7 @@ def main() -> int:
             )
         )
         for name, worker, kwargs, error_key in arms:
-            res = spawn_workers(worker, p, kwargs)
+            res = spawn(worker, p, kwargs)
             payload_bytes = res[0].payload["payload_bytes_per_step"]
             row = {
                 "strategy": name,
@@ -501,8 +533,8 @@ def main() -> int:
         ("zero_2", zero_equivalence_worker, {"stage": 2, "steps": args.steps}),
         ("zero_3", zero3_equivalence_worker, {"steps": args.steps}),
     ):
-        plain = spawn_workers(worker, p, kwargs)
-        clipped = spawn_workers(worker, p, {**kwargs, "grad_clip": 1.0})
+        plain = spawn(worker, p, kwargs)
+        clipped = spawn(worker, p, {**kwargs, "grad_clip": 1.0})
         steps_run = max(int(plain[0].payload["steps"]), 1)
         row = {
             "strategy": name,
@@ -546,7 +578,7 @@ def main() -> int:
 
     # ------------------------------------------------------- context par
     print("\n[5/6] context / sequence parallel")
-    cp = spawn_workers(sequence_parallel_worker, p, {"batch": 2, "seq": 32})
+    cp = spawn(sequence_parallel_worker, p, {"batch": 2, "seq": 32})
     cv = cp[0].value
     equivalence["context_parallel"] = {
         "what_is_compared": (
@@ -593,7 +625,7 @@ def main() -> int:
 
     # ------------------------------------------------------------ DTensor
     print("[6/6] DTensor")
-    dt = spawn_workers(dtensor_worker, p, {})
+    dt = spawn(dtensor_worker, p, {})
     dv = dt[0].value
     equivalence["dtensor"] = {
         "what_is_compared": (
@@ -713,4 +745,11 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    # A hardware or placement problem is one sentence, not a traceback. It is
+    # the most likely way this script fails on a machine it has not run on
+    # before, and a stack trace would bury the sentence that says what to do.
+    try:
+        raise SystemExit(main())
+    except HardwareError as exc:
+        print(f"\n{exc}", file=sys.stderr)
+        raise SystemExit(1) from None

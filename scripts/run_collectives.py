@@ -35,6 +35,7 @@ from transformer_internals.cluster.fabric import (
     link_from_measurement,
     predicted_vs_measured,
 )
+from transformer_internals.hardware import HardwareError
 
 
 def main() -> int:
@@ -202,4 +203,11 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    # A hardware or placement problem is one sentence, not a traceback. It is
+    # the most likely way this script fails on a machine it has not run on
+    # before, and a stack trace would bury the sentence that says what to do.
+    try:
+        raise SystemExit(main())
+    except HardwareError as exc:
+        print(f"\n{exc}", file=sys.stderr)
+        raise SystemExit(1) from None
