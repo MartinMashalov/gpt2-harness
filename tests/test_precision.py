@@ -98,6 +98,33 @@ def test_unknown_dtype_names_are_rejected():
         reduce_dtype_of("fp8")
 
 
+def test_the_fp16_scaler_is_a_real_scaler_with_the_whole_interface():
+    """As far as this machine can check it, which is the construction and the API.
+
+    The fp16 branch cannot be executed here: fp16 autocast needs CUDA, and a
+    GradScaler on a CPU-only build disables itself. What can be checked is that
+    the factory finds a scaler at all, which is not free -- torch.amp.GradScaler
+    is the current spelling and arrived in 2.3, torch.cuda.amp.GradScaler is the
+    old one and is deprecated from 2.4, and this package supports 2.2 through
+    2.5 -- and that the object it returns has the four methods the training loop
+    calls on it.
+    """
+    import warnings
+
+    policy = resolve_amp(True, "fp16", "cuda", AMPERE)
+    with warnings.catch_warnings():
+        # "CUDA is not available. Disabling." on this machine, which is the point.
+        warnings.simplefilter("ignore")
+        scaler = make_grad_scaler(policy)
+
+    assert scaler is not None
+    for method in ("scale", "unscale_", "step", "update"):
+        assert callable(getattr(scaler, method)), method
+    # Self-disabled here, because there is no CUDA. Asserted rather than left
+    # implicit, so the limit of what this test covers is written down.
+    assert scaler.is_enabled() is torch.cuda.is_available()
+
+
 def test_no_scaler_is_ever_built_for_a_path_that_does_not_need_one():
     """The bug this replaces: a disabled GradScaler on a bf16 path."""
     for policy in (
