@@ -369,6 +369,20 @@
       "exact_match": true
     },
     {
+      "quantity": "zero_2.clip_norm_all_reduce",
+      "measured_bytes_per_step": 4.0,
+      "formula": "4 (one fp32 scalar)",
+      "formula_bytes_per_step": 4.0,
+      "exact_match": true
+    },
+    {
+      "quantity": "zero_1.clip_norm_all_reduce",
+      "measured_bytes_per_step": 0.0,
+      "formula": "0 (stage 1 holds the whole gradient already)",
+      "formula_bytes_per_step": 0.0,
+      "exact_match": true
+    },
+    {
       "quantity": "context_parallel.all_gather",
       "measured_bytes_per_step": 16384.0,
       "formula": "2 * 4 * B * T * C  (K and V)",
@@ -389,6 +403,7 @@
         "params": 228096,
         "grads": 228096,
         "optimizer": 228096,
+        "master_shard": 0,
         "decay_mask": 114048,
         "total": 798336
       },
@@ -407,6 +422,7 @@
         "params": 228096,
         "grads": 114048,
         "optimizer": 228096,
+        "master_shard": 0,
         "decay_mask": 114048,
         "total": 684288
       },
@@ -446,6 +462,282 @@
       ]
     }
   },
+  "mixed_precision": {
+    "note": "MEASURED. Same trajectory comparison, run twice, differing only in the dtype the gradient collective carries. The optimizer holds an fp32 master shard on both arms, which is why the bf16 error does not compound across steps. param_dtype is the dtype the parameter all-gather carries; for ZeRO-3 that buffer is also what the unit computes with, so it sets the block's compute dtype too.",
+    "rows": [
+      {
+        "strategy": "ddp",
+        "reduce_dtype": "fp32",
+        "param_dtype": "fp32",
+        "payload_bytes_per_step": 228096.0,
+        "max_error_vs_single_process": 7.82310962677002e-08,
+        "per_step_error": [
+          2.9802322387695312e-08,
+          1.5366822481155396e-08,
+          2.9802322387695312e-08,
+          7.82310962677002e-08
+        ],
+        "reference_scale": null,
+        "bytes_vs_fp32": 1.0,
+        "error_vs_fp32": 1.0,
+        "error_growth_first_to_last_step": 2.625
+      },
+      {
+        "strategy": "zero_1",
+        "reduce_dtype": "fp32",
+        "param_dtype": "fp32",
+        "payload_bytes_per_step": 456192.0,
+        "max_error_vs_single_process": 1.439591869711876e-06,
+        "per_step_error": [
+          1.4386605471372604e-06,
+          1.439591869711876e-06,
+          1.3862736523151398e-06,
+          1.367880031466484e-06
+        ],
+        "reference_scale": 1.003996729850769,
+        "bytes_vs_fp32": 1.0,
+        "error_vs_fp32": 1.0,
+        "error_growth_first_to_last_step": 0.9508011005016993
+      },
+      {
+        "strategy": "zero_2",
+        "reduce_dtype": "fp32",
+        "param_dtype": "fp32",
+        "payload_bytes_per_step": 456192.0,
+        "max_error_vs_single_process": 1.439591869711876e-06,
+        "per_step_error": [
+          1.4386605471372604e-06,
+          1.439591869711876e-06,
+          1.3862736523151398e-06,
+          1.367880031466484e-06
+        ],
+        "reference_scale": 1.003996729850769,
+        "bytes_vs_fp32": 1.0,
+        "error_vs_fp32": 1.0,
+        "error_growth_first_to_last_step": 0.9508011005016993
+      },
+      {
+        "strategy": "zero_3",
+        "reduce_dtype": "fp32",
+        "param_dtype": "fp32",
+        "payload_bytes_per_step": 634624.0,
+        "max_error_vs_single_process": 1.439591869711876e-06,
+        "per_step_error": [
+          1.4386605471372604e-06,
+          1.439591869711876e-06,
+          1.3862736523151398e-06,
+          1.367880031466484e-06
+        ],
+        "reference_scale": 1.003996729850769,
+        "bytes_vs_fp32": 1.0,
+        "error_vs_fp32": 1.0,
+        "error_growth_first_to_last_step": 0.9508011005016993
+      },
+      {
+        "strategy": "ddp",
+        "reduce_dtype": "bf16",
+        "param_dtype": "fp32",
+        "payload_bytes_per_step": 114048.0,
+        "max_error_vs_single_process": 0.00046275556087493896,
+        "per_step_error": [
+          0.00046275556087493896,
+          0.00019751489162445068,
+          0.00021379999816417694,
+          0.0003665164113044739
+        ],
+        "reference_scale": null,
+        "bytes_vs_fp32": 0.5,
+        "error_vs_fp32": 5915.238095238095,
+        "error_growth_first_to_last_step": 0.7920302688777975
+      },
+      {
+        "strategy": "zero_1",
+        "reduce_dtype": "bf16",
+        "param_dtype": "fp32",
+        "payload_bytes_per_step": 342144.0,
+        "max_error_vs_single_process": 0.0010446051601320505,
+        "per_step_error": [
+          0.0009998707100749016,
+          0.0010227810125797987,
+          0.0010374300181865692,
+          0.0010446051601320505
+        ],
+        "reference_scale": 1.003996729850769,
+        "bytes_vs_fp32": 0.75,
+        "error_vs_fp32": 725.6259097525473,
+        "error_growth_first_to_last_step": 1.0447402345187187
+      },
+      {
+        "strategy": "zero_2",
+        "reduce_dtype": "bf16",
+        "param_dtype": "fp32",
+        "payload_bytes_per_step": 342144.0,
+        "max_error_vs_single_process": 0.0010446051601320505,
+        "per_step_error": [
+          0.0009998707100749016,
+          0.0010227810125797987,
+          0.0010374300181865692,
+          0.0010446051601320505
+        ],
+        "reference_scale": 1.003996729850769,
+        "bytes_vs_fp32": 0.75,
+        "error_vs_fp32": 725.6259097525473,
+        "error_growth_first_to_last_step": 1.0447402345187187
+      },
+      {
+        "strategy": "zero_3",
+        "reduce_dtype": "bf16",
+        "param_dtype": "fp32",
+        "payload_bytes_per_step": 520576.0,
+        "max_error_vs_single_process": 0.0010446051601320505,
+        "per_step_error": [
+          0.0009998707100749016,
+          0.0010227810125797987,
+          0.0010374300181865692,
+          0.0010446051601320505
+        ],
+        "reference_scale": 1.003996729850769,
+        "bytes_vs_fp32": 0.8202904396934247,
+        "error_vs_fp32": 725.6259097525473,
+        "error_growth_first_to_last_step": 1.0447402345187187
+      },
+      {
+        "strategy": "zero_1",
+        "reduce_dtype": "fp32",
+        "param_dtype": "bf16",
+        "payload_bytes_per_step": 342144.0,
+        "max_error_vs_single_process": 0.00390625,
+        "per_step_error": [
+          0.001000046730041504,
+          0.0020002126693725586,
+          0.003001093864440918,
+          0.00390625
+        ],
+        "reference_scale": 1.003996729850769,
+        "bytes_vs_fp32": 0.75,
+        "error_vs_fp32": 2713.4426653727965,
+        "error_growth_first_to_last_step": 3.906067469305042
+      },
+      {
+        "strategy": "zero_2",
+        "reduce_dtype": "fp32",
+        "param_dtype": "bf16",
+        "payload_bytes_per_step": 342144.0,
+        "max_error_vs_single_process": 0.00390625,
+        "per_step_error": [
+          0.001000046730041504,
+          0.0020002126693725586,
+          0.003001093864440918,
+          0.00390625
+        ],
+        "reference_scale": 1.003996729850769,
+        "bytes_vs_fp32": 0.75,
+        "error_vs_fp32": 2713.4426653727965,
+        "error_growth_first_to_last_step": 3.906067469305042
+      },
+      {
+        "strategy": "zero_3",
+        "reduce_dtype": "fp32",
+        "param_dtype": "bf16",
+        "payload_bytes_per_step": 431360.0,
+        "max_error_vs_single_process": 0.0032020306680351496,
+        "per_step_error": [
+          0.0019997889176011086,
+          0.002809430006891489,
+          0.0028185155242681503,
+          0.0032020306680351496
+        ],
+        "reference_scale": 1.003996729850769,
+        "bytes_vs_fp32": 0.6797095603065753,
+        "error_vs_fp32": 2224.2628174025554,
+        "error_growth_first_to_last_step": 1.6011843249317619
+      }
+    ]
+  },
+  "gradient_clipping": {
+    "note": "MEASURED. A global gradient-norm clip needs the norm over every parameter, and a rank holds only its slice, so the ranks must agree on one scalar before any of them updates. ZeRO-1 already holds the whole averaged gradient and pays nothing; ZeRO-2 and ZeRO-3 pay one extra all-reduce of a single fp32 scalar per step, which carries no bandwidth and is entirely latency.",
+    "clip": 1.0,
+    "rows": [
+      {
+        "strategy": "zero_1",
+        "extra_all_reduce_calls_per_step": 0.0,
+        "extra_bytes_per_step": 0.0,
+        "max_norm_disagreement_vs_torch": 1.1920928955078125e-07,
+        "max_param_error_clipped": 1.5274854376912117e-06,
+        "max_param_error_unclipped": 1.439591869711876e-06,
+        "global_norms": [
+          {
+            "sharded": 1.287545919418335,
+            "reference": 1.287545919418335
+          },
+          {
+            "sharded": 0.8801844716072083,
+            "reference": 0.880184531211853
+          },
+          {
+            "sharded": 0.9552285671234131,
+            "reference": 0.9552286267280579
+          },
+          {
+            "sharded": 0.9190429449081421,
+            "reference": 0.9190428256988525
+          }
+        ]
+      },
+      {
+        "strategy": "zero_2",
+        "extra_all_reduce_calls_per_step": 1.0,
+        "extra_bytes_per_step": 4.0,
+        "max_norm_disagreement_vs_torch": 5.960464477539063e-08,
+        "max_param_error_clipped": 1.5274854376912117e-06,
+        "max_param_error_unclipped": 1.439591869711876e-06,
+        "global_norms": [
+          {
+            "sharded": 1.287545919418335,
+            "reference": 1.287545919418335
+          },
+          {
+            "sharded": 0.8801844716072083,
+            "reference": 0.880184531211853
+          },
+          {
+            "sharded": 0.9552285671234131,
+            "reference": 0.9552286267280579
+          },
+          {
+            "sharded": 0.9190428853034973,
+            "reference": 0.9190428256988525
+          }
+        ]
+      },
+      {
+        "strategy": "zero_3",
+        "extra_all_reduce_calls_per_step": 1.0,
+        "extra_bytes_per_step": 4.0,
+        "max_norm_disagreement_vs_torch": 5.960464477539063e-08,
+        "max_param_error_clipped": 1.5274854376912117e-06,
+        "max_param_error_unclipped": 1.439591869711876e-06,
+        "global_norms": [
+          {
+            "sharded": 1.287545919418335,
+            "reference": 1.287545919418335
+          },
+          {
+            "sharded": 0.880184531211853,
+            "reference": 0.880184531211853
+          },
+          {
+            "sharded": 0.9552285671234131,
+            "reference": 0.9552286267280579
+          },
+          {
+            "sharded": 0.9190428853034973,
+            "reference": 0.9190428256988525
+          }
+        ]
+      }
+    ]
+  },
   "pipeline": {
     "measured_bubble": [
       {
@@ -453,10 +745,10 @@
         "micro_batches": 1,
         "micro_batch_size": 16,
         "analytic_bubble": 0.75,
-        "measured_bubble": 0.7518308233813853,
-        "makespan_seconds": 0.7840959579916671,
-        "compute_seconds_all_ranks": 0.7783537931391038,
-        "comm_seconds_all_ranks": 1.6495823321165517,
+        "measured_bubble": 0.7517271119099286,
+        "makespan_seconds": 0.8060903750010766,
+        "compute_seconds_all_ranks": 0.800521541852504,
+        "comm_seconds_all_ranks": 1.7469548759399913,
         "peak_stash": 1
       },
       {
@@ -464,10 +756,10 @@
         "micro_batches": 2,
         "micro_batch_size": 8,
         "analytic_bubble": 0.6,
-        "measured_bubble": 0.6049338760714231,
-        "makespan_seconds": 0.48871391598368064,
-        "compute_seconds_all_ranks": 0.7722972499905154,
-        "comm_seconds_all_ranks": 0.8417727081105113,
+        "measured_bubble": 0.6071668420505676,
+        "makespan_seconds": 0.5012534590205178,
+        "compute_seconds_all_ranks": 0.7876359169604257,
+        "comm_seconds_all_ranks": 0.8674728740588762,
         "peak_stash": 2
       },
       {
@@ -475,10 +767,10 @@
         "micro_batches": 4,
         "micro_batch_size": 4,
         "analytic_bubble": 0.42857142857142855,
-        "measured_bubble": 0.4361089468723046,
-        "makespan_seconds": 0.3449694159789942,
-        "compute_seconds_all_ranks": 0.7781006690929644,
-        "comm_seconds_all_ranks": 0.43248608062276617,
+        "measured_bubble": 0.4364715788009905,
+        "makespan_seconds": 0.3501895419904031,
+        "compute_seconds_all_ranks": 0.7893670388730243,
+        "comm_seconds_all_ranks": 0.4403185879345983,
         "peak_stash": 4
       },
       {
@@ -486,10 +778,10 @@
         "micro_batches": 8,
         "micro_batch_size": 2,
         "analytic_bubble": 0.2727272727272727,
-        "measured_bubble": 0.29327609221374706,
-        "makespan_seconds": 0.2942747920169495,
-        "compute_seconds_all_ranks": 0.8318841239088215,
-        "comm_seconds_all_ranks": 0.24520041298819706,
+        "measured_bubble": 0.2940744302855445,
+        "makespan_seconds": 0.2923714169883169,
+        "compute_seconds_all_ranks": 0.825569836422801,
+        "comm_seconds_all_ranks": 0.250985121820122,
         "peak_stash": 8
       },
       {
@@ -497,10 +789,10 @@
         "micro_batches": 16,
         "micro_batch_size": 1,
         "analytic_bubble": 0.15789473684210525,
-        "measured_bubble": 0.18911317552139228,
-        "makespan_seconds": 0.27788854198297486,
-        "compute_seconds_all_ranks": 0.901344629470259,
-        "comm_seconds_all_ranks": 0.14943575172219425,
+        "measured_bubble": 0.20037865146693912,
+        "makespan_seconds": 0.28210054099326953,
+        "compute_seconds_all_ranks": 0.9022944600437768,
+        "comm_seconds_all_ranks": 0.16592120315181091,
         "peak_stash": 16
       },
       {
@@ -508,10 +800,10 @@
         "micro_batches": 1,
         "micro_batch_size": 16,
         "analytic_bubble": 0.75,
-        "measured_bubble": 0.7516547595202934,
-        "makespan_seconds": 0.7360772080137394,
-        "compute_seconds_all_ranks": 0.7312050849432126,
-        "comm_seconds_all_ranks": 1.5735681261285208,
+        "measured_bubble": 0.7513834405986229,
+        "makespan_seconds": 0.8184382920153439,
+        "compute_seconds_all_ranks": 0.8139092489727773,
+        "comm_seconds_all_ranks": 1.7109372489503585,
         "peak_stash": 1
       },
       {
@@ -519,10 +811,10 @@
         "micro_batches": 2,
         "micro_batch_size": 8,
         "analytic_bubble": 0.6,
-        "measured_bubble": 0.6022737219133855,
-        "makespan_seconds": 0.4693268329720013,
-        "compute_seconds_all_ranks": 0.7466544579365291,
-        "comm_seconds_all_ranks": 0.8054052900406532,
+        "measured_bubble": 0.603708207330785,
+        "makespan_seconds": 0.5127993330243044,
+        "compute_seconds_all_ranks": 0.8128726678551175,
+        "comm_seconds_all_ranks": 0.8766636638902128,
         "peak_stash": 2
       },
       {
@@ -530,10 +822,10 @@
         "micro_batches": 4,
         "micro_batch_size": 4,
         "analytic_bubble": 0.42857142857142855,
-        "measured_bubble": 0.44375395973623344,
-        "makespan_seconds": 0.354245875030756,
-        "compute_seconds_all_ranks": 0.7881914610625245,
-        "comm_seconds_all_ranks": 0.4482627490069717,
+        "measured_bubble": 0.43835959080268927,
+        "makespan_seconds": 0.34752179199131206,
+        "compute_seconds_all_ranks": 0.7807291258359328,
+        "comm_seconds_all_ranks": 0.44046766491374,
         "peak_stash": 4
       },
       {
@@ -541,10 +833,10 @@
         "micro_batches": 8,
         "micro_batch_size": 2,
         "analytic_bubble": 0.2727272727272727,
-        "measured_bubble": 0.29998974539877576,
-        "makespan_seconds": 0.2987281669629738,
-        "compute_seconds_all_ranks": 0.8364511208492331,
-        "comm_seconds_all_ranks": 0.25655517040286213,
+        "measured_bubble": 0.2954789870397836,
+        "makespan_seconds": 0.2942185419960879,
+        "compute_seconds_all_ranks": 0.8291325809550472,
+        "comm_seconds_all_ranks": 0.2526958312955685,
         "peak_stash": 4
       },
       {
@@ -552,10 +844,10 @@
         "micro_batches": 16,
         "micro_batch_size": 1,
         "analytic_bubble": 0.15789473684210525,
-        "measured_bubble": 0.1949307225275918,
-        "makespan_seconds": 0.2800447909976356,
-        "compute_seconds_all_ranks": 0.9018218301935121,
-        "comm_seconds_all_ranks": 0.15515629085712135,
+        "measured_bubble": 0.1954621323892216,
+        "makespan_seconds": 0.281907707976643,
+        "compute_seconds_all_ranks": 0.9072217049542814,
+        "comm_seconds_all_ranks": 0.16184908209834248,
         "peak_stash": 4
       }
     ],
@@ -925,6 +1217,6 @@
       "repeats": 3
     },
     "measured_vs_modelled": "equivalence errors, collective counts, payload bytes, resident bytes and the bubble scan are MEASURED on this machine. wire_bytes_ring_model and projection_gpt2_124m are MODELLED from the formulas printed beside them.",
-    "runtime_seconds": 48.561614990234375
+    "runtime_seconds": 103.79200506210327
   }
 }

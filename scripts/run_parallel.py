@@ -64,6 +64,18 @@ def _calls_per_step(payload: dict[str, Any], op: str) -> float:
     return 0.0 if rec is None else rec["calls"] / max(payload["steps"], 1)
 
 
+def _calls(payload: dict[str, Any], op: str) -> int:
+    """Total calls to one collective, or 0 if the strategy never issues it."""
+    rec = payload["per_collective"].get(op)
+    return 0 if rec is None else int(rec["calls"])
+
+
+def _bytes(payload: dict[str, Any], op: str) -> int:
+    """Total payload bytes for one collective, or 0."""
+    rec = payload["per_collective"].get(op)
+    return 0 if rec is None else int(rec["payload_bytes"])
+
+
 def _check(name: str, measured: float, formula: str, predicted: float) -> dict[str, Any]:
     """Record a measured number beside the closed form it is supposed to equal."""
     ok = abs(measured - predicted) <= 1e-9 * max(1.0, abs(predicted))
@@ -341,6 +353,148 @@ def main() -> int:
         for m in (1, 2, 4, 8, 16, 32)
     ]
 
+    # ------------------------------------------ mixed precision on the wire
+    print("[2b/6] what a bf16 wire costs")
+    mixed: dict[str, Any] = {
+        "note": (
+            "MEASURED. Same trajectory comparison, run twice, differing only in "
+            "the dtype the gradient collective carries. The optimizer holds an "
+            "fp32 master shard on both arms, which is why the bf16 error does "
+            "not compound across steps. param_dtype is the dtype the parameter "
+            "all-gather carries; for ZeRO-3 that buffer is also what the unit "
+            "computes with, so it sets the block's compute dtype too."
+        ),
+        "rows": [],
+    }
+    print(f"\n      {'strategy':<10}{'reduce':>8}{'param':>8}{'bytes/step':>12}{'traj error':>13}")
+    print("      " + "-" * 51)
+    for reduce_dtype, param_dtype in (("fp32", "fp32"), ("bf16", "fp32"), ("fp32", "bf16")):
+        rd = None if reduce_dtype == "fp32" else reduce_dtype
+        pd = None if param_dtype == "fp32" else param_dtype
+        arms: list[tuple[str, Any, dict[str, Any], str]] = []
+        if param_dtype == "fp32":
+            arms.append(
+                (
+                    "ddp",
+                    ddp_equivalence_worker,
+                    {"batch": batch, "seq": seq, "steps": args.steps, "reduce_dtype": rd},
+                    "max_grad_error",
+                )
+            )
+        for stage in (1, 2):
+            arms.append(
+                (
+                    f"zero_{stage}",
+                    zero_equivalence_worker,
+                    {
+                        "stage": stage,
+                        "steps": args.steps,
+                        "reduce_dtype": rd,
+                        "param_dtype": pd,
+                    },
+                    "max_param_error",
+                )
+            )
+        arms.append(
+            (
+                "zero_3",
+                zero3_equivalence_worker,
+                {"steps": args.steps, "reduce_dtype": rd, "param_dtype": pd},
+                "max_param_error",
+            )
+        )
+        for name, worker, kwargs, error_key in arms:
+            res = spawn_workers(worker, p, kwargs)
+            payload_bytes = res[0].payload["payload_bytes_per_step"]
+            row = {
+                "strategy": name,
+                "reduce_dtype": reduce_dtype,
+                "param_dtype": param_dtype,
+                "payload_bytes_per_step": payload_bytes,
+                "max_error_vs_single_process": max(r.value[error_key] for r in res),
+                "per_step_error": res[0].value.get(
+                    "param_errors", res[0].value.get("grad_errors")
+                ),
+                "reference_scale": res[0].value.get("reference_param_scale"),
+            }
+            mixed["rows"].append(row)
+            print(
+                f"      {name:<10}{reduce_dtype:>8}{param_dtype:>8}"
+                f"{payload_bytes:>12,.0f}{row['max_error_vs_single_process']:>13.2e}"
+            )
+    base = {r["strategy"]: r for r in mixed["rows"] if r["reduce_dtype"] == "fp32" and r["param_dtype"] == "fp32"}
+    for row in mixed["rows"]:
+        ref = base[row["strategy"]]
+        row["bytes_vs_fp32"] = row["payload_bytes_per_step"] / ref["payload_bytes_per_step"]
+        row["error_vs_fp32"] = (
+            row["max_error_vs_single_process"] / ref["max_error_vs_single_process"]
+        )
+        if row["per_step_error"]:
+            first, last = row["per_step_error"][0], row["per_step_error"][-1]
+            row["error_growth_first_to_last_step"] = last / first if first else float("nan")
+
+    # ------------------------------------------------- clipping under sharding
+    print("\n[2c/6] a global gradient clip on a sharded gradient")
+    clipping: dict[str, Any] = {
+        "note": (
+            "MEASURED. A global gradient-norm clip needs the norm over every "
+            "parameter, and a rank holds only its slice, so the ranks must agree "
+            "on one scalar before any of them updates. ZeRO-1 already holds the "
+            "whole averaged gradient and pays nothing; ZeRO-2 and ZeRO-3 pay one "
+            "extra all-reduce of a single fp32 scalar per step, which carries no "
+            "bandwidth and is entirely latency."
+        ),
+        "clip": 1.0,
+        "rows": [],
+    }
+    for name, worker, kwargs in (
+        ("zero_1", zero_equivalence_worker, {"stage": 1, "steps": args.steps}),
+        ("zero_2", zero_equivalence_worker, {"stage": 2, "steps": args.steps}),
+        ("zero_3", zero3_equivalence_worker, {"steps": args.steps}),
+    ):
+        plain = spawn_workers(worker, p, kwargs)
+        clipped = spawn_workers(worker, p, {**kwargs, "grad_clip": 1.0})
+        steps_run = max(int(plain[0].payload["steps"]), 1)
+        row = {
+            "strategy": name,
+            "extra_all_reduce_calls_per_step": (
+                _calls(clipped[0].payload, "all_reduce") - _calls(plain[0].payload, "all_reduce")
+            )
+            / steps_run,
+            "extra_bytes_per_step": (
+                _bytes(clipped[0].payload, "all_reduce") - _bytes(plain[0].payload, "all_reduce")
+            )
+            / steps_run,
+            "max_norm_disagreement_vs_torch": max(
+                r.value["max_grad_norm_error"] for r in clipped
+            ),
+            "max_param_error_clipped": max(r.value["max_param_error"] for r in clipped),
+            "max_param_error_unclipped": max(r.value["max_param_error"] for r in plain),
+            "global_norms": clipped[0].value["grad_norms"],
+        }
+        clipping["rows"].append(row)
+        print(
+            f"      {name}: +{row['extra_all_reduce_calls_per_step']:.0f} all-reduce/step "
+            f"({row['extra_bytes_per_step']:.0f} B) | norm agrees with "
+            f"torch.nn.utils.clip_grad_norm_ to {row['max_norm_disagreement_vs_torch']:.1e}"
+        )
+    checks.append(
+        _check(
+            "zero_2.clip_norm_all_reduce",
+            clipping["rows"][1]["extra_bytes_per_step"],
+            "4 (one fp32 scalar)",
+            4.0,
+        )
+    )
+    checks.append(
+        _check(
+            "zero_1.clip_norm_all_reduce",
+            clipping["rows"][0]["extra_bytes_per_step"],
+            "0 (stage 1 holds the whole gradient already)",
+            0.0,
+        )
+    )
+
     # ------------------------------------------------------- context par
     print("\n[5/6] context / sequence parallel")
     cp = spawn_workers(sequence_parallel_worker, p, {"batch": 2, "seq": 32})
@@ -450,6 +604,8 @@ def main() -> int:
         "comms": comms_report,
         "formula_checks": checks,
         "memory": memory,
+        "mixed_precision": mixed,
+        "gradient_clipping": clipping,
         "pipeline": pipeline,
         "projection_gpt2_124m": projection,
         "meta": {

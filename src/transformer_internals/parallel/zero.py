@@ -320,19 +320,27 @@ class ShardedAdamW:
         self.exp_avg_sq = torch.zeros(self.shard_size, device=device)
         #: Stage 2 keeps the reduced gradient shard here and frees ``p.grad``.
         self.grad_shard = torch.zeros(self.shard_size, device=device)
-        #: The fp32 master copy of this rank's slice of the flat parameter
-        #: vector, updated in place every step. Persistent, rather than
-        #: re-derived from the replicated parameters each step, which is the
-        #: whole point: with ``param_dtype`` bf16 the replicated copies have been
-        #: through a bf16 all-gather and re-deriving from them would let that
-        #: rounding compound into the optimizer trajectory.
-        self.master_shard = (
-            _flatten([p.detach() for p in self.params], self.padded)[
-                self.shard_start : self.shard_start + self.shard_size
-            ]
-            .clone()
-            .float()
-        )
+        #: A persistent fp32 master copy of this rank's slice of the flat
+        #: parameter vector, or ``None``.
+        #:
+        #: ``None`` when the parameter all-gather is already fp32, because then
+        #: the replicated parameters *are* the master copy and a second one
+        #: would be ``4N/p`` bytes per rank of pure duplication. It exists
+        #: exactly when ``param_dtype`` is narrower than fp32: those replicated
+        #: copies have then been through a lossy all-gather, and re-deriving the
+        #: shard from them every step would feed that rounding back into the
+        #: optimizer and let it compound. FSDP makes the same distinction, and
+        #: the cost of the copy shows up as its own line in
+        #: :meth:`resident_bytes` rather than being folded into the ZeRO totals.
+        self.master_shard: torch.Tensor | None = None
+        if self.param_dtype != torch.float32:
+            self.master_shard = (
+                _flatten([p.detach() for p in self.params], self.padded)[
+                    self.shard_start : self.shard_start + self.shard_size
+                ]
+                .clone()
+                .float()
+            )
 
     # -- memory accounting ------------------------------------------------
 
@@ -365,7 +373,7 @@ class ShardedAdamW:
             grad_bytes = state_bytes([p.grad for p in self.params if p.grad is not None])
         opt_bytes = self.state_bytes()
         decay_bytes = state_bytes([self.decay])
-        master_bytes = state_bytes([self.master_shard])
+        master_bytes = state_bytes([self.master_shard]) if self.master_shard is not None else 0
         return {
             "params": param_bytes,
             "grads": grad_bytes,
@@ -440,8 +448,17 @@ class ShardedAdamW:
             self.last_grad_norm = float(total_norm)
             self.grad_shard.mul_(clip_coefficient(total_norm, self.grad_clip))
 
+        # With an fp32 all-gather the replicated parameters are lossless, so the
+        # shard can be read back out of them; with a narrower one it cannot, and
+        # the persistent master is what the update is applied to instead.
+        if self.master_shard is not None:
+            shard = self.master_shard
+        else:
+            flat_param = _flatten([p.detach() for p in self.params], self.padded)
+            shard = flat_param[self.shard_start : self.shard_start + self.shard_size].clone()
+
         adamw_update_(
-            self.master_shard,
+            shard,
             self.grad_shard,
             self.exp_avg,
             self.exp_avg_sq,
@@ -457,10 +474,8 @@ class ShardedAdamW:
         # updated shards go back out. This all-gather is the second half of what
         # DDP's all-reduce was doing all along. Under param_dtype=bf16 it is the
         # collective that rounds; the master shard above is untouched by it.
-        gathered = torch.empty(
-            self.padded, dtype=self.param_dtype, device=self.master_shard.device
-        )
-        comms.all_gather_into(gathered, self.master_shard.to(self.param_dtype))
+        gathered = torch.empty(self.padded, dtype=self.param_dtype, device=shard.device)
+        comms.all_gather_into(gathered, shard.to(self.param_dtype))
 
         offset = 0
         with torch.no_grad():
@@ -497,7 +512,11 @@ class _GatherRunFree(torch.autograd.Function):
     why the two implementations are worth measuring separately.
 
     The shard itself, and therefore the optimizer's view of the parameters, stays
-    fp32 on both paths.
+    fp32 on both paths. ZeRO-3 needs no separate master copy at any dtype: the
+    shard is never overwritten by a gathered buffer, so the fp32 parameter it
+    holds is already the master. That is a real asymmetry with stages 1 and 2,
+    where the replicated parameters *are* overwritten by the all-gather and a
+    narrow ``param_dtype`` therefore forces a second fp32 copy.
     """
 
     @staticmethod
