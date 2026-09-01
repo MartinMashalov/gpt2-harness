@@ -19,7 +19,6 @@ from __future__ import annotations
 import gzip
 import json
 import math
-import os
 import statistics
 from pathlib import Path
 from typing import Any
@@ -28,6 +27,7 @@ import pytest
 import torch
 
 import transformer_internals.perf.diagnose as diag
+from conftest import machine_is_oversubscribed
 from transformer_internals.cluster.failure import free_port
 from transformer_internals.config import GPTConfig
 from transformer_internals.model import GPT
@@ -80,31 +80,6 @@ def fake_peak() -> MachinePeak:
 
 
 # ------------------------------------------------------------------ roofline
-
-
-def _machine_is_oversubscribed() -> bool:
-    """True when there are more runnable processes than cores.
-
-    A one-minute load average above the core count means every process is
-    waiting for a core, so a wall-clock difference of a few milliseconds is the
-    scheduler and not the thing under test. Used to gate timing assertions, and
-    only timing assertions. Returns False where the load average is unavailable,
-    which keeps the assertion on rather than off by default.
-    """
-    if not hasattr(os, "getloadavg"):
-        return False
-    try:
-        one_minute = os.getloadavg()[0]
-    except OSError:
-        return False
-    cores = os.cpu_count() or 1
-    if one_minute > cores:
-        print(
-            f"\n[timing] skipping the timing comparison: load average "
-            f"{one_minute:.1f} on {cores} cores"
-        )
-        return True
-    return False
 
 
 def test_ridge_point_is_the_ratio_of_the_two_peaks(fake_peak: MachinePeak) -> None:
@@ -385,7 +360,11 @@ def test_matmul_dominates_a_transformer_step_on_cpu() -> None:
     assert top["category"] == "matmul"
     assert top["self_fraction"] > 0.3
     # And it dominates, which is the claim rather than merely leading. Measured
-    # minimum over five profiles at this shape: 3.36.
+    # minimum over five profiles at this shape on an idle machine: 3.36. Gated,
+    # because contention lands on operator dispatch rather than on the GEMMs and
+    # so compresses exactly this ratio: 0.519 against 0.266 at load 176.
+    if machine_is_oversubscribed():
+        return
     assert top["self_fraction"] > 2.0 * second["self_fraction"], (
         f"matmul {top['self_fraction']:.3f} vs "
         f"{second['category']} {second['self_fraction']:.3f}"
@@ -455,7 +434,7 @@ def test_diagnosis_finds_an_injected_dataloader_stall(fake_peak: MachinePeak) ->
     # half of the step, and it would have to inflate it past 200 ms to break
     # this.
     assert top.cost_fraction > 0.5, top.cost_fraction
-    if not _machine_is_oversubscribed():
+    if not machine_is_oversubscribed():
         assert top.cost_fraction > 0.8, top.cost_fraction
 
 
@@ -668,7 +647,7 @@ def test_collective_probe_measures_real_ranks() -> None:
         # asserting on the scheduler. The structural checks above and below run
         # everywhere; this one runs where a timing means something, and says so
         # when it does not.
-        if _machine_is_oversubscribed():
+        if machine_is_oversubscribed():
             continue
         paired = [
             arm_s - floor_s

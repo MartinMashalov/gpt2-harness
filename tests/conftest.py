@@ -7,10 +7,46 @@ whole suite runs on an offline CPU runner.
 
 from __future__ import annotations
 
+import os
+
 import pytest
 import torch
 
 from transformer_internals.config import GPTConfig
+
+
+def machine_is_oversubscribed() -> bool:
+    """True when there are more runnable processes than cores.
+
+    Used to gate wall-clock assertions, and only wall-clock assertions. A
+    one-minute load average above the core count means every process is waiting
+    for a core, so a comparison between two measured times is a comparison of
+    scheduler luck: on this laptop at a load average of 176 on ten cores, a
+    step that normally takes 2 ms took 90, and the per-iteration spread on a
+    25 ms collective step was 160 ms.
+
+    Every structural assertion runs regardless. What is gated is the handful of
+    assertions whose subject is a duration, and a gated one prints the load
+    average so a skipped comparison is visible in the log rather than silent.
+    An idle CI runner never trips it.
+
+    Returns False where the load average is unavailable, so the assertions are
+    on by default rather than off.
+    """
+    if not hasattr(os, "getloadavg"):
+        return False
+    try:
+        one_minute = os.getloadavg()[0]
+    except OSError:
+        return False
+    cores = os.cpu_count() or 1
+    if one_minute > cores:
+        print(
+            f"\n[timing] not asserting on wall clock: load average "
+            f"{one_minute:.1f} on {cores} cores"
+        )
+        return True
+    return False
 
 
 @pytest.fixture(scope="session")
