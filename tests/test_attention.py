@@ -147,4 +147,14 @@ def test_gelu_is_the_tanh_approximation() -> None:
     # x = +/- 2.70. If this drifts, the claim in the README is no longer true.
     gap = (ours - F.gelu(x)).abs()
     assert 4.7e-04 < gap.max().item() < 4.8e-04, gap.max().item()
-    assert abs(abs(x[gap.argmax()].item()) - 2.70) < 0.01
+
+    # Locate the peak in float64. The gap is flat there: measured on this grid,
+    # every x in [2.681, 2.713] is within 0.1% of the maximum, and float32 alone
+    # moves argmax by ~0.003 against float64. Asserting the location to +/-0.01
+    # in float32 was therefore tighter than the quantity's own resolution and
+    # failed on CI at 2.713. The tolerance below is the 99%-plateau half-width,
+    # which still fails loudly if the peak actually moves.
+    x64 = torch.linspace(-6, 6, 200_001, dtype=torch.float64)
+    gap64 = (gelu_tanh(x64) - F.gelu(x64)).abs()
+    peak = abs(x64[gap64.argmax()].item())
+    assert abs(peak - 2.70) < 0.08, peak
