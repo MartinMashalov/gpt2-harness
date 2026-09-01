@@ -60,6 +60,7 @@ device is current at initialisation, so getting this wrong puts two ranks on GPU
 
 from __future__ import annotations
 
+import datetime
 import os
 import queue
 import tempfile
@@ -399,6 +400,7 @@ def _entry(
     queue: Any,
     backend: str,
     device: str,
+    timeout: float,
 ) -> None:
     """Child-process entry point: bind the device, init the group, run ``fn``."""
     # One thread per rank. Without this, p ranks each spin up a full BLAS thread
@@ -406,6 +408,13 @@ def _entry(
     # Harmless on CUDA, where the host threads are not doing the arithmetic.
     torch.set_num_threads(1)
     try:
+        if backend == "nccl":
+            # Without this, a rank that dies leaves its peers blocked inside a
+            # NCCL collective until the watchdog fires, which defaults to thirty
+            # minutes. With it they raise instead. Both spellings are set: torch
+            # renamed the variable in 2.4 and this package supports 2.2 to 2.5.
+            os.environ.setdefault("NCCL_ASYNC_ERROR_HANDLING", "1")
+            os.environ.setdefault("TORCH_NCCL_ASYNC_ERROR_HANDLING", "1")
         # Before init_process_group, not after: see the module docstring.
         bound = hardware.set_visible_device(device)
         common.set_device(bound)
@@ -414,6 +423,10 @@ def _entry(
             init_method=f"file://{store_file}",
             rank=rank,
             world_size=world_size,
+            # The group's own timeout, matched to the launcher's. NCCL defaults
+            # to thirty minutes, which on a rented box is thirty minutes of a
+            # deadlock nobody is watching.
+            timeout=datetime.timedelta(seconds=max(timeout, 60.0)),
         )
         with counter_scope(world_size) as counted:
             value = fn(rank=rank, world_size=world_size, **kwargs)
@@ -498,6 +511,7 @@ def spawn_workers(
                 q,
                 chosen,
                 devices[rank],
+                timeout,
             ),
             daemon=True,
         )
