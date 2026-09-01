@@ -198,6 +198,19 @@ any single transformer block. At sequence 1024 it is 15.0 GB and the attention
 probabilities go from 22% of a layer to 36%. Those two are **computed by the
 validated count, not measured**, since neither shape has been run here.
 
+The count is fp32 and **refuses to produce a bf16 number**, which is worth
+saying because halving every term is the obvious thing to do and is wrong in the
+unsafe direction. `torch.autocast` keeps LayerNorm, its saved statistics and the
+cross-entropy log-softmax in fp32, and for GPT-2's vocabulary that last tensor
+is the largest single term. Measured rather than argued: a bf16 autocast forward
+holds **0.70x** of the fp32 stash on the tested model, not 0.50x. It also adds a
+weight cache, one narrow copy of every weight an autocast operator consumed,
+which the graph saves on its own storages; the meter finds those by walking each
+saved tensor's `grad_fn` back through view and cast nodes and reports them as
+parameter memory rather than as activations. Which operators autocast keeps in
+fp32 is torch's policy, differs between CPU and CUDA, and has changed between
+releases, so the measurement handles bf16 and the analytic count declines to.
+
 ### bf16 on the wire, and the fp32 master copy that makes it safe
 
 Two dtypes, set independently, exactly as FSDP's

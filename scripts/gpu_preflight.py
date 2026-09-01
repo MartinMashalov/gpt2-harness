@@ -95,22 +95,31 @@ def _arithmetic_checks(caps: Capabilities) -> dict[str, Any]:
             "seq": seq,
             "activation_bytes_fp32": terms["total"],
             "activation_gib_fp32": terms["total"] / 1024**3,
-            "activation_gib_bf16": analytic_activation_bytes(cfg, batch, seq, 2)["total"]
-            / 1024**3,
         }
         if caps.total_memory_bytes:
             smallest = min(caps.total_memory_bytes) / 1024**3
-            row["fits_in_one_gpu_bf16"] = row["activation_gib_bf16"] < 0.8 * smallest
+            # Sized on the fp32 figure, deliberately. bf16 autocast can only
+            # reduce the activation stash, never grow it, so fp32 is the safe
+            # side of the question "will this fit"; and the analytic count
+            # refuses to produce a bf16 number, because halving every term is
+            # wrong by about 40% in the unsafe direction. 0.8 leaves room for
+            # the parameters, the gradients, the optimizer state and the
+            # allocator's fragmentation, none of which are in this column.
+            row["fits_in_one_gpu_fp32"] = row["activation_gib_fp32"] < 0.8 * smallest
             row["device_gib"] = smallest
         shapes.append(row)
 
     cfg8 = ParallelConfig(tp=8, dp=1)
     return {
         "note": (
-            "Arithmetic, not measurement. The activation count is exact against "
-            "measurement on this machine (tests/test_activation_memory.py), so "
-            "evaluating it at an unrun shape is what it is for. The fabric rows "
-            "are MODELLED from published bandwidths."
+            "Arithmetic, not measurement. The fp32 activation count is exact "
+            "against measurement on this machine (tests/test_activation_memory"
+            ".py), so evaluating it at an unrun shape is what it is for. It is "
+            "fp32 only and refuses any other element size; under autocast the "
+            "stash is smaller, measured at 0.70x on the CPU test model rather "
+            "than the 0.50x a naive halving would give, so fp32 is the safe "
+            "figure for sizing. The fabric rows are MODELLED from published "
+            "bandwidths."
         ),
         "gpt2_124m_activation_memory": shapes,
         "modelled_70b_tp8_seconds_per_step": {
@@ -188,15 +197,20 @@ def main() -> int:
             )
 
     checks = _arithmetic_checks(caps)
-    print("\nGPT-2 124M activation memory, from the exact count (arithmetic, not measured)")
-    print(f"  {'batch':>6}{'seq':>6}{'fp32 GiB':>11}{'bf16 GiB':>11}{'fits':>8}")
+    print("\nGPT-2 124M activation memory, from the exact fp32 count (arithmetic, not measured)")
+    print(f"  {'batch':>6}{'seq':>6}{'fp32 GiB':>11}{'fits':>8}")
     for row in checks["gpt2_124m_activation_memory"]:
-        fits = row.get("fits_in_one_gpu_bf16")
+        fits = row.get("fits_in_one_gpu_fp32")
         mark = "-" if fits is None else ("yes" if fits else "NO")
         print(
-            f"  {row['batch']:>6}{row['seq']:>6}{row['activation_gib_fp32']:>11.2f}"
-            f"{row['activation_gib_bf16']:>11.2f}{mark:>8}"
+            f"  {row['batch']:>6}{row['seq']:>6}{row['activation_gib_fp32']:>11.2f}{mark:>8}"
         )
+    print(
+        "  fp32 on purpose: bf16 autocast can only shrink this, so it is the safe\n"
+        "  side of 'will it fit'. It does not shrink it by half, because autocast\n"
+        "  keeps LayerNorm and the loss in fp32; measured on the CPU test model,\n"
+        "  0.70x. It also adds a weight cache of 2N bytes, not counted here."
+    )
 
     for problem in resolution["problems"]:
         print(f"\nPROBLEM: {problem}")

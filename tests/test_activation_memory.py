@@ -217,6 +217,73 @@ def test_the_count_refuses_configurations_it_does_not_enumerate():
         analytic_activation_bytes(_config(use_sdpa=True), 2, 16)
     with pytest.raises(ValueError, match="multi-head attention only"):
         analytic_activation_bytes(_config(n_kv_head=2), 2, 16)
+    with pytest.raises(ValueError, match="fp32 only"):
+        analytic_activation_bytes(_config(), 2, 16, dtype_bytes=2)
+
+
+# --------------------------------------------------------------------------- #
+# under autocast
+# --------------------------------------------------------------------------- #
+
+
+def _autocast_stash(amp: bool, cfg: GPTConfig) -> ActivationMeter:
+    from transformer_internals.precision import autocast_context, resolve_amp
+
+    torch.manual_seed(0)
+    model = GPT(cfg).train()
+    g = torch.Generator().manual_seed(1)
+    x = torch.randint(0, cfg.vocab_size, (4, 32), generator=g)
+    y = torch.randint(0, cfg.vocab_size, (4, 32), generator=g)
+    meter = ActivationMeter(exclude=[*model.parameters(), *model.buffers()])
+    with meter, autocast_context(resolve_amp(amp, "bf16", "cpu")):
+        loss = model(x, targets=y)["loss"]
+    loss.backward()
+    return meter
+
+
+def test_bf16_autocast_does_not_halve_the_activation_stash():
+    """The reason the analytic count refuses bf16, measured rather than argued.
+
+    Autocast keeps LayerNorm, its saved statistics and the cross-entropy
+    log-softmax in fp32, and for a GPT-2-shaped vocabulary that last tensor is
+    the largest single term. So the stash falls, but nowhere near by half. A
+    naive halving would be wrong in the unsafe direction, which is why
+    analytic_activation_bytes will not produce one.
+    """
+    cfg = _config()
+    fp32 = _autocast_stash(False, cfg).peak_bytes
+    bf16 = _autocast_stash(True, cfg).peak_bytes
+    assert bf16 < fp32, "autocast should shrink the stash"
+    ratio = bf16 / fp32
+    assert 0.55 < ratio < 0.95, f"bf16 stash is {ratio:.3f} of fp32"
+    # And a halving would have been wrong by a wide margin, which is the point.
+    assert ratio > 0.5 * 1.15
+
+
+def test_autocast_weight_casts_are_counted_as_parameters_and_not_activations():
+    """The graph saves bf16 copies of the weights, on their own storages.
+
+    Charging them to activations would make bf16 look worse than it is, and
+    ignoring them entirely would lose 2N bytes of real memory. They get their
+    own line.
+    """
+    cfg = _config()
+    without = _autocast_stash(False, cfg)
+    with_amp = _autocast_stash(True, cfg)
+
+    assert without.parameter_cast_bytes == 0, "no autocast, no casts"
+    assert with_amp.parameter_cast_bytes > 0
+    # Every cast is a narrow copy of a weight, so the total cannot exceed the
+    # parameters it copied.
+    assert with_amp.parameter_cast_bytes < with_amp.excluded_bytes
+    assert with_amp.to_dict()["parameter_cast_bytes"] == with_amp.parameter_cast_bytes
+
+
+def test_the_fp32_stash_is_unchanged_by_the_cast_classification():
+    """The classification must not perturb the path whose count is exact."""
+    report = _measure(_config())
+    assert report.measured_bytes == report.analytic_bytes
+    assert report.detail["parameter_cast_bytes"] == 0
 
 
 def test_the_loss_term_is_bigger_than_a_whole_transformer_block():

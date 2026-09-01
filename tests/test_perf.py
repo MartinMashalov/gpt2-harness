@@ -553,6 +553,13 @@ def test_collective_probe_measures_real_ranks() -> None:
 
     Structure and self-consistency only. The absolute milliseconds depend on
     what else the machine is doing and are not asserted anywhere.
+
+    Twelve timed steps rather than three. The assertion that adding
+    communication cannot make a step faster is structurally true and is compared
+    on each arm's *minimum*; with three samples on a shared machine the
+    no-communication arm's minimum is not a reliable estimate of its floor, and
+    this failed under load with 24.5 ms against 29.3 ms. More samples lower that
+    floor towards the truth. The assertions themselves are unchanged.
     """
     payload = collective_probe(
         model_config={
@@ -566,8 +573,8 @@ def test_collective_probe_measures_real_ranks() -> None:
         world_size=2,
         batch=2,
         seq=32,
-        steps=3,
-        warmup=1,
+        steps=12,
+        warmup=2,
         port=29699,
     )
     assert payload["world_size"] == 2

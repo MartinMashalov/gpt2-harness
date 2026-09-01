@@ -250,9 +250,13 @@ or *gloo* in the repository, and everything here becomes a measurement.
    modelled and stays labelled; what replaces it is a measured A100 GEMM peak
    and a measured step time.
 8. **Activation memory from the CUDA allocator.** The saved-tensor accounting
-   already works on any device and is exact. On CUDA the meter additionally
-   reports `torch.cuda.max_memory_allocated`, which includes the transient
-   workspaces the stash does not, and that is the number that decides an OOM.
+   already works on any device and is exact in fp32. On CUDA the meter
+   additionally reports `torch.cuda.max_memory_allocated`, which includes the
+   transient workspaces the stash does not, and that is the number that decides
+   an OOM. The bf16 figure is measured rather than computed, here and there,
+   because autocast's cast policy is torch's and is not the same list on CPU and
+   CUDA. Measuring it on an A100 is worth doing for exactly that reason: the
+   0.70x measured on CPU is a CPU number.
 9. **Comm and compute overlap, from a real profiler trace.** torch 2.2's
    profiler has no MPS backend, so the committed trace is CPU-only and the
    overlap claims in Part 3 are about scheduling rather than about a wire. On
@@ -293,9 +297,14 @@ the variable when it is set.
 through a real `GradScaler`; the message says so.
 
 **Out of memory in the parallel stage.** Run
-`python scripts/gpu_preflight.py --dry-run` and read the activation table: it is
-exact against measurement and it will tell you the shape does not fit before you
-try it.
+`python scripts/gpu_preflight.py --dry-run` and read the activation table. It is
+the fp32 count, which is exact against measurement, and it is deliberately the
+fp32 one: bf16 autocast can only shrink the activation stash, so fp32 is the
+safe side of "will it fit". It does not shrink it by half. Autocast keeps
+LayerNorm, its saved statistics and the cross-entropy log-softmax in fp32, and
+measured on the CPU test model the bf16 stash is 0.70x of the fp32 one, not
+0.50x. Autocast also adds a weight cache of `2N` bytes that the activation
+column does not carry.
 
 **A stage dies and takes the run with it.** It does not: markers survive.
 `./scripts/run_on_gpu.sh --resume`.

@@ -40,6 +40,15 @@ mask buffer. Charging those to activations would double-count the parameter
 column, which is exactly the mistake this column exists to avoid, so the meter
 is given the model's parameters and buffers and skips their storages.
 
+**Under autocast the graph saves bf16 *copies* of the weights too**, and those
+have different storages, so skipping the parameters by storage does not catch
+them. They are the autocast weight cache: one narrow copy of every weight an
+autocast-listed operator consumed, kept for the backward pass. It is real memory
+and it is not an activation, so the meter classifies it separately by walking a
+saved tensor's ``grad_fn`` back through view and cast nodes to see whether it
+originates at a parameter. Measured on the test model: five cast weights,
+57,344 bytes, and zero without autocast.
+
 Where CUDA is present, the allocator peak is reported **as well**, labelled
 separately. It is the larger number and it is the one that decides whether a run
 OOMs, because it includes the transient buffers that the stash does not.
@@ -72,6 +81,19 @@ because it can be evaluated at a shape nobody has run: it says how much
 activation memory a configuration will need before the box is rented. Where the
 count would be wrong it refuses to produce a number at all, rather than being
 quietly wrong; see :func:`analytic_activation_bytes`.
+
+**The count is fp32 only, and refuses anything else.** Halving every term for
+bf16 is wrong, and wrong in the unsafe direction. ``torch.autocast`` keeps
+LayerNorm, its saved mean and inverse standard deviation, and the cross-entropy
+log-softmax in fp32, and that last one is the largest single tensor in a
+GPT-2-shaped model. Measured on the test model, a bf16 autocast forward holds
+**0.70x** of the fp32 stash, not 0.50x. Worse, which operators autocast keeps in
+fp32 is torch's own policy, it is not the same list for CPU and CUDA, and it has
+changed between releases, so enumerating it from this model's source would be a
+guess dressed as a count. The measurement handles bf16 correctly on any device;
+the analytic count refuses it. For sizing a run, the fp32 figure is the safe one:
+autocast can only reduce the stash, never grow it, while adding a weight cache
+of ``2N`` bytes that the parameter column should carry.
 """
 
 from __future__ import annotations
@@ -87,11 +109,60 @@ from transformer_internals.config import GPTConfig
 
 __all__ = [
     "GELU_TANH_SAVED_TENSORS",
+    "PASSTHROUGH_NODES",
     "ActivationMeter",
     "ActivationReport",
     "analytic_activation_bytes",
     "measure_activation_bytes",
 ]
+
+
+#: Autograd node names that only view or re-type their input, so a saved tensor
+#: reached through nothing but these still *is* whatever it started as. Used to
+#: recognise autocast's narrow copies of the weights: the graph saves them, they
+#: have their own storages, and they are parameter memory rather than activation
+#: memory. The list is deliberately short. Anything not on it ends the walk and
+#: the tensor counts as an activation, so an unrecognised node makes the meter
+#: over-report rather than under-report.
+PASSTHROUGH_NODES = frozenset(
+    {
+        "TBackward0",
+        "ViewBackward0",
+        "UnsafeViewBackward0",
+        "ToCopyBackward0",
+        "ExpandBackward0",
+        "PermuteBackward0",
+        "TransposeBackward0",
+        "ReshapeAliasBackward0",
+        "CloneBackward0",
+        "DetachBackward0",
+        "SqueezeBackward0",
+        "UnsqueezeBackward0",
+    }
+)
+
+
+def _source_leaf(tensor: torch.Tensor, max_depth: int = 8) -> torch.Tensor | None:
+    """The leaf a saved tensor is a pure view or cast of, if it is one.
+
+    Walks ``grad_fn`` back through :data:`PASSTHROUGH_NODES` only. Returns the
+    leaf's tensor when the walk ends at an ``AccumulateGrad``, and ``None`` on
+    the first node that computes anything, on a branch, or past ``max_depth``.
+    """
+    node = tensor.grad_fn
+    for _ in range(max_depth):
+        if node is None:
+            return None
+        name = type(node).__name__
+        if name == "AccumulateGrad":
+            return getattr(node, "variable", None)
+        if name not in PASSTHROUGH_NODES:
+            return None
+        nexts = [n for n, _ in node.next_functions if n is not None]
+        if len(nexts) != 1:
+            return None
+        node = nexts[0]
+    return None
 
 
 #: How many extra ``4 * n_embd``-wide tensors the tanh GELU leaves in the graph.
@@ -129,7 +200,9 @@ class ActivationMeter:
             collected when it is a CUDA device and skipped everywhere else.
         exclude: Tensors whose storages are *not* activations. Pass the model's
             parameters and buffers: the graph saves weights too, and counting
-            them here would double-count the parameter column.
+            them here would double-count the parameter column. Passing them also
+            switches on recognition of autocast's narrow *copies* of those
+            weights, which have their own storages and are counted separately.
 
     Example:
         >>> meter = ActivationMeter(exclude=model.parameters())
@@ -160,6 +233,10 @@ class ActivationMeter:
         self._current = 0
         self.peak_bytes = 0
         self.tensors_saved = 0
+        #: Storage bytes of autocast's narrow copies of the weights. Real memory,
+        #: parameter memory, not activation memory.
+        self.parameter_cast_bytes = 0
+        self._cast_seen: set[int] = set()
         self.cuda_peak_allocated_bytes: int | None = None
         self._cuda_baseline: int | None = None
         self._ctx: Any = None
@@ -182,6 +259,15 @@ class ActivationMeter:
             # A weight or a buffer the graph kept for its own backward. Real
             # memory, already counted in the parameter column.
             return tensor
+        if self._excluded:
+            leaf = _source_leaf(tensor)
+            if leaf is not None and self._storage_key(leaf) in self._excluded:
+                # An autocast cast of a weight: a different storage holding the
+                # same parameter in a narrower dtype. Parameter memory.
+                if key not in self._cast_seen:
+                    self._cast_seen.add(key)
+                    self.parameter_cast_bytes += nbytes
+                return tensor
         self.tensors_saved += 1
         entry = self._live.get(key)
         if entry is None:
@@ -204,6 +290,13 @@ class ActivationMeter:
         if entry[1] <= 0:
             self._current -= entry[0]
             del self._live[key]
+
+    @staticmethod
+    def _storage_key(tensor: torch.Tensor) -> int:
+        try:
+            return tensor.untyped_storage().data_ptr()
+        except (RuntimeError, NotImplementedError, AttributeError):
+            return -1
 
     @staticmethod
     def _unpack(tensor: torch.Tensor) -> torch.Tensor:
@@ -243,6 +336,7 @@ class ActivationMeter:
             "activation_bytes": self._current,
             "distinct_storages": len(self._live),
             "saved_tensor_count": self.tensors_saved,
+            "parameter_cast_bytes": self.parameter_cast_bytes,
         }
 
     def to_dict(self) -> dict[str, Any]:
@@ -252,6 +346,13 @@ class ActivationMeter:
             "distinct_storages": len(self._live),
             "saved_tensor_count": self.tensors_saved,
             "excluded_parameter_and_buffer_bytes": self.excluded_bytes,
+            "parameter_cast_bytes": self.parameter_cast_bytes,
+            "parameter_cast_note": (
+                "autocast's narrow copies of the weights, kept by the graph for "
+                "the backward pass. Real memory and parameter memory, so it is "
+                "reported here rather than folded into the activation figure. "
+                "Zero when autocast is off."
+            ),
             "method": (
                 "torch.autograd.graph.saved_tensors_hooks; distinct storages, "
                 "counted once each, parameters and buffers excluded"
@@ -331,10 +432,13 @@ def analytic_activation_bytes(
     Args:
         cfg: Architecture.
         batch / seq: Step shape.
-        dtype_bytes: Element size of the activations. 4 for fp32, 2 under bf16
-            autocast, except that LayerNorm's saved mean and inverse standard
-            deviation stay fp32 and the token indices stay int64, and both are
-            counted at their own widths.
+        dtype_bytes: Element size of the activations. **4, and only 4.** See the
+            module docstring: halving the terms for bf16 is wrong by 40% in the
+            unsafe direction, because autocast keeps LayerNorm, its statistics
+            and the cross-entropy log-softmax in fp32, and its cast policy is
+            torch's own and differs between CPU and CUDA. Use the measurement
+            for a narrow compute dtype; use this for sizing, where the fp32
+            figure is the safe one.
         with_loss: Include the loss terms. The log-softmax output is a
             ``tokens x vocab`` tensor, which for GPT-2 at vocab 50257 is larger
             than an entire block's activations, so an accounting that leaves it
@@ -368,6 +472,18 @@ def analytic_activation_bytes(
             "analytic_activation_bytes covers multi-head attention only; GQA and "
             "MQA insert a repeat_interleave whose output is an extra saved "
             "tensor of a different width."
+        )
+    if dtype_bytes != 4:
+        raise ValueError(
+            f"analytic_activation_bytes covers fp32 only, got dtype_bytes="
+            f"{dtype_bytes}. Under autocast, LayerNorm, its saved statistics and "
+            f"the cross-entropy log-softmax all stay in fp32, so halving every "
+            f"term understates the stash by about 40%: measured 0.70x of the "
+            f"fp32 figure, not 0.50x. Which operators autocast keeps in fp32 is "
+            f"torch's policy, differs between CPU and CUDA, and has changed "
+            f"between releases, so counting it from this model's source would be "
+            f"a guess. Measure it with ActivationMeter instead, or size the run "
+            f"with the fp32 number, which autocast can only reduce."
         )
 
     n = float(batch * seq)  # tokens in the step
