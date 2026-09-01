@@ -54,13 +54,13 @@ were measured on.
 
 | | | |
 |---|---|---|
-| **Shard** | data, sharded-data, tensor, pipeline and context parallelism, each proven equivalent to one process | [Part 1](#part-1--parallelism-proven-not-asserted) |
-| **Profile** | measured roofline, MFU, and an operator-level profile of a real step | [Part 2](#part-2--roofline-and-mfu) |
-| **Diagnose** | four throughput pathologies injected, four found and quantified | [Part 3](#part-3--why-is-this-run-slow) |
-| **Survive** | resharding checkpoints, killing a rank, restarting, streaming data | [Part 4](#part-4--the-harness-checkpoints-failure-and-data) |
-| **Build** | GPT-2 in pure PyTorch, from the architecture up | [Part 5](#part-5--the-implementation) |
-| **Verify** | prove it computes the same function as the reference | [Part 6](#part-6--verification) |
-| **Measure** | ablations, induction heads, and inference efficiency | [Parts 7-8](#part-7--using-it-as-an-instrument) |
+| **Shard** | data, sharded-data, tensor, pipeline and context parallelism, each proven equivalent to one process | [Part 1](#part-1-parallelism-proven-not-asserted) |
+| **Profile** | measured roofline, MFU, and an operator-level profile of a real step | [Part 2](#part-2-roofline-and-mfu) |
+| **Diagnose** | four throughput pathologies injected, four found and quantified | [Part 3](#part-3-why-is-this-run-slow) |
+| **Survive** | resharding checkpoints, killing a rank, restarting, streaming data | [Part 4](#part-4-the-harness-checkpoints-failure-and-data) |
+| **Build** | GPT-2 in pure PyTorch, from the architecture up | [Part 5](#part-5-the-implementation) |
+| **Verify** | prove it computes the same function as the reference | [Part 6](#part-6-verification) |
+| **Measure** | ablations, induction heads, and inference efficiency | [Parts 7-8](#part-7-using-it-as-an-instrument) |
 
 ---
 
