@@ -74,7 +74,11 @@ the point. Anyone can write a `dist.all_reduce` call; the question is whether
 the thing around it computes the same function.
 
 **Worst disagreement with the single-process reference, anywhere in the table
-below: 2.4e-06.** Source for every number here:
+below: 2.4e-06.** It is the all-gather-KV context-parallel path's weight
+gradient, against a gradient whose own scale is 14.6. That same path's *forward*
+is bit-identical, 0.0 exactly. Its row carries both, because a forward output
+and a weight gradient are two different comparisons and the column is misleading
+with only one of them in it. Source for every number here:
 [`results/parallel_comms.json`](results/parallel_comms.json), written by
 `make parallel` in 107 seconds.
 
@@ -86,8 +90,8 @@ below: 2.4e-06.** Source for every number here:
 | ZeRO-3 (FSDP) | + parameters | 2 all-gathers and 1 reduce-scatter per unit | **1.4e-06** | 634,624 B | `8N_unit` + `4N_unit` |
 | tensor parallel | every weight in the block | 4 all-reduces of activations per block | **3.6e-07** forward, **1.9e-06** backward | 24,576 B | `4 · 4BTC` |
 | pipeline, GPipe and 1F1B | layers into stages | 1 send + 1 recv per stage boundary | **3.0e-08** on every stage gradient | 32,768 B over 3 boundaries | `4BTC` per boundary |
-| context parallel, all-gather KV | the sequence | 2 all-gathers + 2 reduce-scatters | **0.0, bit-identical** | 61,440 B | `2 · 4BTC` |
-| context parallel, ring | the sequence | `2(p-1)` sends and recvs | **1.2e-07** | 8,192 B of ring p2p | `2(p-1)/p · 4BTC` |
+| context parallel, all-gather KV | the sequence | 2 all-gathers + 2 reduce-scatters | **2.4e-06** weight grad, 3.0e-07 input grad, **0.0 bit-identical** forward | 61,440 B | `2 · 4BTC` |
+| context parallel, ring | the sequence | `2(p-1)` sends and recvs | **1.2e-07** forward (the ring path is forward only) | 8,192 B of ring p2p | `2(p-1)/p · 4BTC` |
 | DTensor | same sharding as above, expressed as placements | (as tensor parallel) | **0.0** against the hand-written version | | |
 
 The errors are compared against the scale of what is being compared, which is
