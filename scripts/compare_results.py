@@ -8,12 +8,23 @@ reports the ones that moved.
 The output is deliberately blunt about three categories, because they mean
 different things:
 
-**Correctness numbers must not move.** Equivalence errors, formula checks and
-byte counts are properties of the algorithm, not of the hardware. An
-equivalence error that changes by orders of magnitude between backends is a
-finding and probably a bug; a byte count that changes at all is definitely one.
-Those paths are matched by :data:`INVARIANT_PATTERNS` and are reported first,
-under their own heading, whether or not they moved.
+**Correctness numbers must not move**, and there are two kinds of "must not".
+
+A byte count, a collective count or a formula check is an integer property of
+the algorithm. It must be **bit-identical** between a gloo run and a NCCL run,
+and any change at all is a bug. Those are :data:`EXACT_INVARIANTS`.
+
+An equivalence error is a float. It *cannot* be bit-identical across backends,
+because NCCL reduces in a different order from gloo and float addition is not
+associative, so demanding equality would fail every cross-backend run for the
+wrong reason. What must hold is the property the tests assert and
+``parallel_comms.json`` records: every error stays under
+:data:`EQUIVALENCE_TOLERANCE`, which is 1e-5. Those are
+:data:`TOLERANT_INVARIANTS`, and they are reported with their ratio so a change
+that stays inside the tolerance is still visible.
+
+Both kinds are reported first, under their own heading, whether or not they
+moved, because "it did not move" is the result.
 
 **Timings are expected to move**, by a lot, and are reported with the ratio
 rather than the difference.
@@ -41,15 +52,25 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _common import RESULTS
 
-#: Paths whose value is a property of the algorithm and not of the machine.
-#: Anything matching these is reported even when it did not move, because "it
-#: did not move" is the result.
-INVARIANT_PATTERNS = [
+#: The tolerance every equivalence proof in this repository is asserted at, in
+#: ``tests/test_parallel.py`` and recorded as ``tolerance`` in
+#: ``results/parallel_comms.json``. An error under it is a correct
+#: implementation; an error over it is a bug, whatever backend produced it.
+EQUIVALENCE_TOLERANCE = 1e-5
+
+#: Integer properties of the algorithm. Bit-identical or it is a bug.
+EXACT_INVARIANTS = [
     re.compile(r"formula_checks.*(exact_match|formula_bytes_per_step)$"),
-    re.compile(r"equivalence\..*error$"),
     re.compile(r"\.payload_bytes(_per_step)?$"),
     re.compile(r"\.calls$"),
     re.compile(r"resharding\.reshards\..*\.bitwise_identical$"),
+]
+
+#: Float properties of the algorithm. They move between backends because float
+#: addition is not associative and NCCL does not reduce in gloo's order; what
+#: must hold is that they stay under :data:`EQUIVALENCE_TOLERANCE`.
+TOLERANT_INVARIANTS = [
+    re.compile(r"equivalence\..*error$"),
     re.compile(r"failure_restart\.max_abs_loss_difference$"),
 ]
 
@@ -155,28 +176,35 @@ def load_tree(root: Path) -> dict[str, Any]:
     return flat
 
 
-def git_baseline(ref: str, results_dir: Path) -> Path:
+def git_baseline(ref: str, git_path: str) -> Path:
     """Extract the committed result files at ``ref`` into a temporary directory.
 
     Uses ``git show`` per file rather than a checkout, so nothing in the working
     tree is touched by taking a baseline.
+
+    ``git_path`` is the path *inside the repository*, and is deliberately not
+    derived from ``--current``. A smoke run compares ``smoke/results`` against
+    the committed ``results``, and taking the basename of the current directory
+    would have looked for ``HEAD:results`` by luck and for ``HEAD:sres`` under
+    any other name.
     """
     tmp = Path(tempfile.mkdtemp(prefix="ti-baseline-"))
     listing = subprocess.run(
-        ["git", "ls-tree", "--name-only", f"{ref}:{results_dir.name}"],
+        ["git", "ls-tree", "--name-only", f"{ref}:{git_path}"],
         capture_output=True,
         text=True,
         check=False,
     )
     if listing.returncode != 0:
         raise RuntimeError(
-            f"could not list {results_dir.name}/ at {ref}: {listing.stderr.strip()}"
+            f"could not list {git_path}/ at {ref}: {listing.stderr.strip()}. "
+            f"Pass --baseline-git-path if the committed results live elsewhere."
         )
     for name in listing.stdout.split():
         if not name.endswith(".json"):
             continue
         blob = subprocess.run(
-            ["git", "show", f"{ref}:{results_dir.name}/{name}"],
+            ["git", "show", f"{ref}:{git_path}/{name}"],
             capture_output=True,
             check=False,
         )
@@ -198,6 +226,7 @@ def compare(
     buckets: dict[str, list[tuple[str, Any, Any]]] = {
         "invariant_held": [],
         "invariant_moved": [],
+        "within_tolerance": [],
         "timing": [],
         "moved": [],
         "added": [],
@@ -211,12 +240,22 @@ def compare(
         if path not in baseline:
             buckets["added"].append((path, None, after))
             continue
+        exact = _matches(path, EXACT_INVARIANTS)
+        tolerant = _matches(path, TOLERANT_INVARIANTS)
         if before == after:
-            if _matches(path, INVARIANT_PATTERNS):
+            if exact or tolerant:
                 buckets["invariant_held"].append((path, before, after))
             continue
-        if _matches(path, INVARIANT_PATTERNS):
+        if exact:
             buckets["invariant_moved"].append((path, before, after))
+            continue
+        if tolerant:
+            # A float equivalence error. It is allowed to move; it is not
+            # allowed to leave the tolerance the tests assert.
+            if isinstance(after, (int, float)) and after <= EQUIVALENCE_TOLERANCE:
+                buckets["within_tolerance"].append((path, before, after))
+            else:
+                buckets["invariant_moved"].append((path, before, after))
             continue
         if _matches(path, TIMING_PATTERNS):
             buckets["timing"].append((path, before, after))
@@ -239,6 +278,11 @@ def main() -> int:
     )
     ap.add_argument("--current", default=str(RESULTS))
     ap.add_argument(
+        "--baseline-git-path",
+        default=str(RESULTS),
+        help="path inside the repository whose committed JSONs are the baseline",
+    )
+    ap.add_argument(
         "--threshold",
         type=float,
         default=0.01,
@@ -260,9 +304,9 @@ def main() -> int:
     if args.baseline:
         baseline_dir = Path(args.baseline)
     elif args.baseline_git:
-        baseline_dir = git_baseline(args.baseline_git, current_dir)
+        baseline_dir = git_baseline(args.baseline_git, args.baseline_git_path)
     else:
-        baseline_dir = git_baseline("HEAD", current_dir)
+        baseline_dir = git_baseline("HEAD", args.baseline_git_path)
 
     baseline = load_tree(baseline_dir)
     current = load_tree(current_dir)
@@ -275,15 +319,29 @@ def main() -> int:
     print(f"baseline {baseline_dir}  ({len(baseline)} leaf values)")
     print(f"current  {current_dir}  ({len(current)} leaf values)")
 
-    held, moved_inv = buckets["invariant_held"], buckets["invariant_moved"]
-    print(f"\nCORRECTNESS INVARIANTS: {len(held)} unchanged, {len(moved_inv)} MOVED")
+    held = buckets["invariant_held"]
+    moved_inv = buckets["invariant_moved"]
+    tolerated = buckets["within_tolerance"]
+    print(
+        f"\nCORRECTNESS INVARIANTS: {len(held)} identical, "
+        f"{len(tolerated)} moved but within {EQUIVALENCE_TOLERANCE:g}, "
+        f"{len(moved_inv)} BROKEN"
+    )
     if moved_inv:
         print("  These are properties of the algorithm, not of the hardware.")
         print("  Any row here is a finding and probably a bug.")
         for path, before, after in moved_inv[: args.limit]:
             print(f"    {path}\n      {_fmt(before)}  ->  {_fmt(after)}")
     else:
-        print("  Every equivalence error, byte count and formula check is identical.")
+        print("  Every byte count and formula check is identical, and every")
+        print(f"  equivalence error is still under {EQUIVALENCE_TOLERANCE:g}.")
+    for path, before, after in tolerated[: args.limit]:
+        ratio = ""
+        if isinstance(before, (int, float)) and before:
+            ratio = f"   ({after / before:.2f}x)"
+        print(f"  ~ {path}\n      {_fmt(before)}  ->  {_fmt(after)}{ratio}")
+    if len(tolerated) > args.limit:
+        print(f"  ... and {len(tolerated) - args.limit} more within tolerance")
 
     print(f"\nTIMINGS AND RATES: {len(buckets['timing'])} changed")
     for path, before, after in buckets["timing"][: args.limit]:
@@ -320,9 +378,12 @@ def main() -> int:
                 f"configurations, as a smoke run does. Exiting 0."
             )
             return 0
-        print(f"\nFAILED: {len(moved_inv)} correctness invariant(s) changed")
+        print(f"\nFAILED: {len(moved_inv)} correctness invariant(s) broke")
         return 1
-    print("\nOK: every correctness invariant held")
+    print(
+        f"\nOK: every exact invariant is identical and every equivalence error "
+        f"is under {EQUIVALENCE_TOLERANCE:g}"
+    )
     return 0
 
 
