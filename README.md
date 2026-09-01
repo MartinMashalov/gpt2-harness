@@ -5,17 +5,17 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](pyproject.toml)
 [![PyTorch 2.2](https://img.shields.io/badge/PyTorch-2.2-ee4c2c.svg)](pyproject.toml)
 
-**A training harness, built from the parts up: five parallelism strategies, each
-proven to compute the same function as a single process to 2.4e-06, with the
-bytes each one moves counted exactly. A roofline and an MFU measured on real
-hardware. A throughput diagnosis tool that named the injected fault in all four
-broken runs it was handed, and stayed quiet on the control. Sharded checkpoints
-that reshard bitwise across a change of world size, and a rank killed with
-SIGKILL whose restarted loss curve matches the uninterrupted one exactly.**
+**A from-scratch GPT-2 in PyTorch, and the distributed training harness around
+it. Five parallelism strategies, each running as real `torch.distributed`
+processes with one OS process per rank, and each proven to compute the same
+function as a single process computing the same thing unsharded.**
 
-Underneath it is a from-scratch GPT-2 verified against HuggingFace to 6.1e-05,
-which is what makes every measurement above mean something: when a sharded
-implementation disagrees with the reference, it is the sharding.
+A sharded implementation that is subtly wrong does not announce itself. A
+reduce-scatter that drops a shard still runs, still shows a falling loss, and
+turns up later as a model that is worse than it should be for reasons nobody can
+name. So nothing here is asserted correct. Every strategy is compared against a
+single-process reference, on the outputs and on the gradients, and the bytes it
+moves are counted by instrumenting the collectives rather than estimated.
 
 ![Pipeline bubble, measured against the formula](assets/parallel_bubble.png)
 
@@ -24,6 +24,20 @@ idle fraction against `(p-1)/(m+p-1)`, for GPipe and 1F1B. Right: the activation
 stash, which is the only place the two schedules differ. Source:
 [`results/parallel_comms.json`](results/parallel_comms.json). Narrow-column
 version: [`assets/parallel_bubble_web.png`](assets/parallel_bubble_web.png).*
+
+> **Worst disagreement with the single-process reference, across all five
+> strategies: 2.4e-06**, against a gradient whose own scale is 14.6. The GPT-2
+> underneath agrees with HuggingFace to **6.1e-05**, which is what makes the rest
+> mean something: when a sharded implementation disagrees with the reference,
+> the sharding is the only thing left it can be.
+>
+> **A rank killed with `SIGKILL` mid-run** restarts from the last checkpoint and
+> reproduces the uninterrupted loss curve to 0.0 at every step after the resume.
+> Four throughput faults injected, four named, and 0.0% of the step reported on
+> the control.
+>
+> **No GPU cluster.** All of it is one laptop, and every number below is
+> labelled MEASURED on this machine or MODELLED from a published datasheet.
 
 ---
 
