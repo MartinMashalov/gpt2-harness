@@ -76,7 +76,7 @@ the thing around it computes the same function.
 **Worst disagreement with the single-process reference, anywhere in the table
 below: 2.4e-06.** Source for every number here:
 [`results/parallel_comms.json`](results/parallel_comms.json), written by
-`make parallel` in 49 seconds.
+`make parallel` in 104 seconds.
 
 | strategy | what it shards | what it communicates per step | worst error vs one process | measured payload/rank/step | closed form, checked exactly |
 |---|---|---|---|---|---|
@@ -106,7 +106,7 @@ over the four steps.
 ### The bytes are counted, not estimated
 
 Every collective goes through a counting wrapper, so the byte figures above are
-the payloads that actually crossed the call. All eight closed forms matched the
+the payloads that actually crossed the call. All ten closed forms matched the
 measured count **exactly** (`formula_checks` in the JSON, every entry
 `exact_match: true`).
 
@@ -142,6 +142,80 @@ coefficient this implementation holds because a shard boundary can fall inside a
 tensor; it is listed separately because it is not part of the Adam state the
 ZeRO formulas describe.
 
+### bf16 on the wire, and the fp32 master copy that makes it safe
+
+Two dtypes, set independently, exactly as FSDP's
+`MixedPrecision(param_dtype=..., reduce_dtype=...)` sets them: what the
+*gradient* reduction carries, and what the *parameter* all-gather carries.
+Neither is what the optimiser updates. Same four AdamW steps, same world size 2,
+same comparison against single-process `torch.optim.AdamW`, changing only the
+dtype of a collective. Source:
+[`results/parallel_comms.json`](results/parallel_comms.json) -> `mixed_precision`.
+
+| reduce | param | DDP bytes/step | ZeRO-2 bytes/step | worst trajectory error | vs all-fp32 |
+|---|---|---|---|---|---|
+| fp32 | fp32 | 228,096 | 456,192 | **1.44e-06** | 1x |
+| bf16 | fp32 | **114,048** | **342,144** | **1.04e-03** | 726x |
+| fp32 | bf16 | 228,096 | 342,144 | **3.91e-03** | 2713x |
+
+**The gradient reduction halves exactly and costs three orders of magnitude.**
+114,048 is 228,096/2, which is the point of doing it: on a step that is
+communication-bound, this is the cheapest halving available. What it buys is
+paid for in accuracy, and 1.04e-03 is the size of the bill.
+
+**The error does not compound, and that is the fp32 master shard working.** Over
+the four steps the bf16-reduction error goes 1.00, 1.02, 1.04, 1.04 e-03: flat.
+Each step injects a fresh rounding and none of it accumulates, because the AdamW
+update is applied to an fp32 copy that the bf16 collective never touches. A
+sharded optimiser that kept its state at the wire dtype would show this column
+growing instead.
+
+**The parameter all-gather is the more expensive of the two, and the number says
+why.** 3.906e-03 is 2^-8, which is bf16's worst rounding error at 1.0 (its grid
+spacing there is 2^-7), and the largest parameter in the tested model is a
+LayerNorm gain sitting at 1.0. The error is not mysterious drift; it is one
+quantisation step on the biggest weight.
+
+The fp32 master shard is allocated **only** when the parameter all-gather is
+narrower than fp32. With an fp32 gather the replicated parameters already are
+the master copy, and a second one would be `4N/p` bytes per rank of pure
+duplication. ZeRO-3 never needs one at any dtype, because its shard is a real
+`nn.Parameter` that no gather overwrites. That asymmetry is why the memory table
+above is unchanged by any of this.
+
+### Clipping a gradient no rank holds all of
+
+Every real training recipe clips the global gradient norm at 1.0. Under sharding
+that is not a local operation: rank `r` holds a slice, and the norm is over all
+of it, so the ranks have to agree on one scalar before any of them updates.
+
+| stage | extra collectives per step | extra bytes per step | norm vs `torch.nn.utils.clip_grad_norm_` | parameter error, clipped |
+|---|---|---|---|---|
+| ZeRO-1 | **0** | 0 | 1.2e-07 | 1.53e-06 |
+| ZeRO-2 | 1 all-reduce | **4** | 6.0e-08 | 1.53e-06 |
+| ZeRO-3 | 1 all-reduce | **4** | 6.0e-08 | 1.53e-06 |
+
+**ZeRO-1 clips for free and ZeRO-2 does not**, which is a consequence of what
+each one holds rather than a design choice: stage 1 all-reduces the whole
+gradient anyway, so every rank can take the norm locally; stage 2
+reduce-scatters, so no rank has more than its slice. The extra collective is
+four bytes. It carries no bandwidth at all, which means it is entirely latency,
+and latency is the expensive kind of collective. Both closed forms are checked
+alongside the other eight in `formula_checks`, and all ten match exactly.
+
+ZeRO-3 has to add its two kinds of parameter separately. The unit shards are
+disjoint and must be summed across ranks; the root parameters have already been
+all-reduced, so they are identical everywhere and adding them *before* the
+collective would count them `p` times and shrink that part of the norm by
+`sqrt(p)`. That is a bug that grows with the world size and therefore passes on
+one GPU.
+
+The clip reproduces `torch.nn.utils.clip_grad_norm_` to 6e-08 on the norm
+itself, epsilon and clamp included, and the clipped trajectory still tracks a
+clipped single-process reference at 1.53e-06 against 1.44e-06 unclipped. The
+clip bites: the reference norms over the four steps are 1.288, 0.880, 0.955,
+0.919, so step 1 is genuinely scaled down and the rest are not.
+
 ### The pipeline bubble, measured against the formula
 
 Four gloo processes, 8 blocks, 128 wide, batch 16, sequence 128, fastest of
@@ -149,11 +223,11 @@ three repeats. Measured bubble is `1 - sum(compute) / (p × makespan)`.
 
 | micro-batches | `(p-1)/(m+p-1)` | measured GPipe | measured 1F1B | GPipe stash | 1F1B stash |
 |---|---|---|---|---|---|
-| 1 | 0.750 | 0.752 | 0.752 | 1 | 1 |
-| 2 | 0.600 | 0.605 | 0.602 | 2 | 2 |
-| 4 | 0.429 | 0.436 | 0.444 | 4 | 4 |
-| 8 | 0.273 | 0.293 | 0.300 | 8 | **4** |
-| 16 | 0.158 | 0.189 | 0.195 | 16 | **4** |
+| 1 | 0.750 | 0.752 | 0.751 | 1 | 1 |
+| 2 | 0.600 | 0.607 | 0.604 | 2 | 2 |
+| 4 | 0.429 | 0.436 | 0.438 | 4 | 4 |
+| 8 | 0.273 | 0.294 | 0.295 | 8 | **4** |
+| 16 | 0.158 | 0.200 | 0.195 | 16 | **4** |
 
 The measured curve sits slightly above the formula and the gap grows with `m`,
 because the formula charges nothing for the gloo transfers or the
@@ -1102,10 +1176,34 @@ Stated plainly, because the point of the repository is calibration.
 - **Only GPT-2 124M is verified.** The loader is written for the general shape and
   the larger sizes should load unchanged, but "should" is not "does" and they are
   not tested.
-- **No GPU cluster.** Every parallelism strategy runs on gloo over CPU
-  processes, so the equivalence proofs and the byte counts are real and the
-  bandwidth numbers are not. NCCL, NVLink and InfiniBand are modelled from
-  datasheets and labelled as modelled everywhere they appear.
+- **No GPU cluster.** The backend is selected at runtime and a CUDA/NCCL path
+  exists, but nothing in this repository has ever run on it. Every number here
+  was produced by gloo over CPU processes, so the equivalence proofs and the
+  byte counts are real and the bandwidth numbers are not. NCCL, NVLink and
+  InfiniBand are modelled from datasheets and labelled as modelled everywhere
+  they appear.
+- **Mixed precision is implemented and tested, but only on CPU.** bf16 autocast
+  with fp32 master weights runs and is compared against the fp32 path here
+  (4.8e-03 relative on the gradient, which is bf16's own resolution), and CPU
+  bf16 autocast is the same code path as the CUDA one. It is not the same
+  *hardware* path: no tensor core has executed it, and no speedup is claimed
+  anywhere. The fp16 GradScaler branch is real code and is unexecuted, because
+  fp16 autocast needs CUDA.
+- **Ring attention serialises its transfers against its own compute.** Each hop
+  issues the sends, blocks on the receives, and only then attends to the block
+  it already has. The entire performance argument for ring attention is that the
+  next block arrives while the current one is being attended to, so what is
+  implemented here is ring attention's *communication pattern and its numerics*,
+  not its overlap. Fixing it means double-buffering the KV blocks and issuing
+  the next hop before the current attention runs.
+- **Nothing in `parallel/` overlaps communication with computation.** Every
+  collective is issued after the work that produced its input has finished. The
+  repository measures torch DDP doing the opposite, in Part 3, and reports that
+  DDP's bucketed reducer hides most of its all-reduce inside the backward pass;
+  the hand-written implementations here do not attempt it. The byte counts and
+  the equivalence proofs are unaffected, since neither depends on when a
+  collective is issued, and every wall-clock number from this package should be
+  read as un-overlapped.
 - **Ring attention is forward-only.** Its backward needs a second ring carrying
   dK/dV. The all-gather-KV path is differentiable end to end and is what the
   backward equivalence test uses.
